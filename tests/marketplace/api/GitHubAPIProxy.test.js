@@ -280,7 +280,87 @@ async function runTests() {
     assert.strictEqual(results[0].latestRelease, 'v1.0.0');
   });
 
-  // Test 14: Property Test - PAT Authorization Header (Validates Requirement 10.2)
+  // Test 14: Batch fetch extensions via GraphQL
+  await test('should batch fetch extensions using GraphQL', async () => {
+    const mockResponse = {
+      statusCode: 200,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        data: {
+          repo0: {
+            name: 'plugin-1',
+            owner: { login: 'author1' },
+            description: 'Plugin 1',
+            stargazerCount: 100,
+            updatedAt: '2024-01-01T00:00:00Z',
+            latestRelease: { tagName: 'v1.0.0' }
+          },
+          repo1: {
+            name: 'skill-1',
+            owner: { login: 'author2' },
+            description: 'Skill 1',
+            stargazerCount: 75,
+            updatedAt: '2024-01-02T00:00:00Z',
+            latestRelease: null
+          }
+        }
+      })
+    };
+
+    const proxy = new MockGitHubAPIProxy(
+      { cache: createTempCache() },
+      { '*': mockResponse }
+    );
+
+    const results = await proxy.batchFetchExtensions(['author1/plugin-1', 'author2/skill-1']);
+
+    assert.strictEqual(results.length, 2);
+    assert.strictEqual(results[0].name, 'plugin-1');
+    assert.strictEqual(results[0].stars, 100);
+    assert.strictEqual(results[0].latestRelease, 'v1.0.0');
+    assert.strictEqual(results[1].name, 'skill-1');
+    assert.strictEqual(results[1].latestRelease, null);
+  });
+
+  // Test 15: Fallback to REST when GraphQL fails
+  await test('should fallback to REST API when GraphQL fails', async () => {
+    // Create a proxy that fails on GraphQL but succeeds on REST
+    class GraphQLFailingProxy extends MockGitHubAPIProxy {
+      async _makeHttpRequest(url, options) {
+        // Fail GraphQL requests
+        if (options.isGraphQL || url.includes('/graphql')) {
+          throw new Error('GraphQL service unavailable');
+        }
+
+        // Succeed on REST requests
+        this.requestLog.push({ url, options });
+        await wait(10);
+
+        return {
+          statusCode: 200,
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            name: 'test-repo',
+            owner: { login: 'test-owner' },
+            description: 'Test',
+            stargazers_count: 50,
+            updated_at: '2024-01-01T00:00:00Z',
+            topics: []
+          })
+        };
+      }
+    }
+
+    const proxy = new GraphQLFailingProxy({ cache: createTempCache() });
+
+    const results = await proxy.batchFetchExtensions(['test-owner/test-repo']);
+
+    assert.strictEqual(results.length, 1);
+    assert.strictEqual(results[0].name, 'test-repo');
+    assert.strictEqual(results[0].stars, 50);
+  });
+
+  // Test 16: Property Test - PAT Authorization Header (Validates Requirement 10.2)
   await test('Property: PAT Authorization Header (Requirement 10.2)', () => {
     const testToken = 'ghp_test1234567890';
     const proxy = new GitHubAPIProxy({ pat: testToken });
