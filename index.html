@@ -1504,7 +1504,16 @@
         <div id="marketplaceTab" class="tab-content">
             <!-- URL Import Section -->
             <div class="url-import-section">
-                <h3>Install from GitHub URL</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <h3 style="margin: 0;">Install from GitHub URL</h3>
+                    <button class="btn btn-secondary" id="marketplaceSettingsBtn" style="padding: 6px 12px; font-size: 13px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M12 1v6m0 6v6m8.66-13.66l-4.24 4.24M9.17 14.83l-4.24 4.24M23 12h-6M7 12H1m20.66 8.66l-4.24-4.24M9.17 9.17L4.93 4.93"></path>
+                        </svg>
+                        Settings
+                    </button>
+                </div>
                 <div class="url-import-input">
                     <input type="text" id="urlImportInput" placeholder="https://github.com/owner/repository">
                     <button class="btn btn-primary" id="urlImportBtn">

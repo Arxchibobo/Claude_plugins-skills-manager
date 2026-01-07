@@ -1645,6 +1645,98 @@ function setupMarketplaceEventListeners() {
         }
         importFromURL(url);
     });
+
+    // Settings button
+    document.getElementById('marketplaceSettingsBtn')?.addEventListener('click', () => {
+        showMarketplaceSettings();
+    });
+}
+
+// Show marketplace settings modal
+async function showMarketplaceSettings() {
+    const modalTitle = document.getElementById('modalTitle');
+    const modalBody = document.getElementById('modalBody');
+    const modalFooter = document.querySelector('.modal-footer');
+
+    modalTitle.textContent = 'Marketplace Settings';
+
+    // Load current settings
+    let currentPAT = '';
+    try {
+        const response = await fetch(`${API_BASE}/api/marketplace/settings`);
+        if (response.ok) {
+            const data = await response.json();
+            currentPAT = data.pat || '';
+        }
+    } catch (error) {
+        console.error('Failed to load settings:', error);
+    }
+
+    modalBody.innerHTML = `
+        <div style="margin-bottom: 20px;">
+            <h4 style="margin-bottom: 12px; font-size: 16px;">GitHub Personal Access Token (PAT)</h4>
+            <p style="margin-bottom: 12px; font-size: 14px; color: var(--text-secondary);">
+                Required for marketplace to work. Without PAT, GitHub API限制每小时仅10个请求。
+                With PAT: 每小时5000个请求。
+            </p>
+            <div style="background: #FEF3C7; border: 1px solid #F59E0B; border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+                <div style="font-weight: 600; color: #92400E; margin-bottom: 4px;">⚠️ 重要说明</div>
+                <div style="font-size: 13px; color: #78350F;">
+                    市场功能需要GitHub PAT才能正常工作。当前未配置PAT会导致速率限制错误。
+                </div>
+            </div>
+            <label style="display: block; margin-bottom: 8px; font-weight: 600;">GitHub PAT:</label>
+            <input type="password" id="githubPATInput"
+                   placeholder="ghp_xxxxxxxxxxxx"
+                   value="${currentPAT === '***' ? '' : currentPAT}"
+                   style="width: 100%; padding: 10px; border: 1px solid var(--border-primary); border-radius: 8px; font-size: 14px; font-family: monospace;">
+            <div style="margin-top: 12px; font-size: 13px; color: var(--text-secondary);">
+                <div style="margin-bottom: 8px;"><strong>如何获取PAT：</strong></div>
+                <ol style="margin: 0; padding-left: 20px; line-height: 1.8;">
+                    <li>访问 <a href="https://github.com/settings/tokens" target="_blank" style="color: var(--color-primary);">github.com/settings/tokens</a></li>
+                    <li>点击 "Generate new token (classic)"</li>
+                    <li>设置名称和过期时间</li>
+                    <li>不需要选择任何权限（公共API访问即可）</li>
+                    <li>点击 "Generate token" 并复制</li>
+                </ol>
+            </div>
+        </div>
+    `;
+
+    modalFooter.innerHTML = `
+        <button class="btn btn-secondary" id="settingsCancelBtn">Cancel</button>
+        <button class="btn btn-primary" id="settingsSaveBtn">Save Settings</button>
+    `;
+
+    document.getElementById('settingsCancelBtn').addEventListener('click', hideModal);
+    document.getElementById('settingsSaveBtn').addEventListener('click', async () => {
+        const pat = document.getElementById('githubPATInput').value.trim();
+
+        try {
+            const response = await fetch(`${API_BASE}/api/marketplace/settings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pat })
+            });
+
+            if (!response.ok) throw new Error('Failed to save settings');
+
+            hideModal();
+            showToast('Settings saved! Reloading marketplace...', 'success');
+
+            // Reload marketplace
+            setTimeout(() => {
+                marketplaceExtensions = [];
+                loadMarketplaceExtensions();
+            }, 1000);
+
+        } catch (error) {
+            console.error('Failed to save settings:', error);
+            showToast('Failed to save settings: ' + error.message, 'error');
+        }
+    });
+
+    showModal();
 }
 
 // Import from GitHub URL
