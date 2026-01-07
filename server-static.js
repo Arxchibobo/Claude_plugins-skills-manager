@@ -6,6 +6,12 @@ const { exec } = require('child_process');
 const util = require('util');
 const execPromise = util.promisify(exec);
 
+// Marketplace routes
+const MarketplaceRoutes = require('./lib/marketplace/routes/marketplace');
+const marketplaceRoutes = new MarketplaceRoutes({
+  currentVersion: '1.0.0'
+});
+
 const PORT = 3456;
 const SETTINGS_PATH = path.join(process.env.USERPROFILE || process.env.HOME, '.claude', 'settings.json');
 const USER_SKILLS_PATH = path.join(process.env.USERPROFILE || process.env.HOME, '.claude', 'skills');
@@ -422,6 +428,12 @@ async function handleRequest(req, res) {
     try {
         // API Routes
         if (url.startsWith('/api/')) {
+            // Marketplace routes
+            if (url.startsWith('/api/marketplace')) {
+                await marketplaceRoutes.handleRoute(req, res, url, method);
+                return;
+            }
+
             // GET /api/plugins
             if (method === 'GET' && url === '/api/plugins') {
                 const plugins = await getPlugins();
