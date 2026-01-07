@@ -1338,11 +1338,12 @@ function filterMarketplaceExtensions() {
 
     // Category filter
     if (marketplaceCategory === 'featured') {
-        filtered = filtered.filter(e => e.isOfficial);
+        // Show top starred extensions as featured
+        filtered = filtered.sort((a, b) => (b.stars || 0) - (a.stars || 0)).slice(0, 20);
     } else if (marketplaceCategory === 'popular') {
         filtered = filtered.sort((a, b) => (b.stars || 0) - (a.stars || 0));
     } else if (marketplaceCategory === 'recent') {
-        filtered = filtered.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+        filtered = filtered.sort((a, b) => new Date(b.lastUpdated || b.updatedAt || 0) - new Date(a.lastUpdated || a.updatedAt || 0));
     } else if (marketplaceCategory === 'installed') {
         filtered = filtered.filter(e => e.isInstalled);
     } else if (marketplaceCategory === 'updates') {
