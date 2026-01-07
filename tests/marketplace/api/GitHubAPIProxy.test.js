@@ -328,6 +328,106 @@ async function runTests() {
     }
   });
 
+  // Test 16: Get latest release
+  await test('should get latest release for repository', async () => {
+    const mockResponse = {
+      statusCode: 200,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        tag_name: 'v1.2.3',
+        name: 'Release v1.2.3',
+        assets: [
+          { name: 'extension.zip', browser_download_url: 'https://github.com/.../extension.zip' }
+        ]
+      })
+    };
+
+    const proxy = new MockGitHubAPIProxy(
+      { cache: createTempCache() },
+      { '*': mockResponse }
+    );
+
+    const release = await proxy.getLatestRelease('test-owner', 'test-repo');
+
+    assert.strictEqual(release.tag_name, 'v1.2.3');
+    assert.ok(Array.isArray(release.assets));
+    assert.strictEqual(release.assets.length, 1);
+  });
+
+  // Test 17: Get release asset (prefer .zip)
+  await test('should get release asset and prefer .zip files', async () => {
+    const mockResponse = {
+      statusCode: 200,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        tag_name: 'v1.0.0',
+        assets: [
+          { name: 'extension.tar.gz', browser_download_url: 'https://github.com/.../extension.tar.gz' },
+          { name: 'extension.zip', browser_download_url: 'https://github.com/.../extension.zip' },
+          { name: 'checksums.txt', browser_download_url: 'https://github.com/.../checksums.txt' }
+        ]
+      })
+    };
+
+    const proxy = new MockGitHubAPIProxy(
+      { cache: createTempCache() },
+      { '*': mockResponse }
+    );
+
+    const asset = await proxy.getReleaseAsset('test-owner', 'test-repo', 'v1.0.0');
+
+    assert.strictEqual(asset.name, 'extension.zip');
+    assert.ok(asset.browser_download_url.endsWith('.zip'));
+  });
+
+  // Test 18: Get release asset fallback when no .zip
+  await test('should fallback to first asset when no .zip found', async () => {
+    const mockResponse = {
+      statusCode: 200,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        tag_name: 'v1.0.0',
+        assets: [
+          { name: 'extension.tar.gz', browser_download_url: 'https://github.com/.../extension.tar.gz' },
+          { name: 'checksums.txt', browser_download_url: 'https://github.com/.../checksums.txt' }
+        ]
+      })
+    };
+
+    const proxy = new MockGitHubAPIProxy(
+      { cache: createTempCache() },
+      { '*': mockResponse }
+    );
+
+    const asset = await proxy.getReleaseAsset('test-owner', 'test-repo', 'v1.0.0');
+
+    assert.strictEqual(asset.name, 'extension.tar.gz');
+  });
+
+  // Test 19: Handle no assets in release
+  await test('should throw error when release has no assets', async () => {
+    const mockResponse = {
+      statusCode: 200,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        tag_name: 'v1.0.0',
+        assets: []
+      })
+    };
+
+    const proxy = new MockGitHubAPIProxy(
+      { cache: createTempCache() },
+      { '*': mockResponse }
+    );
+
+    try {
+      await proxy.getReleaseAsset('test-owner', 'test-repo', 'v1.0.0');
+      assert.fail('Should have thrown error');
+    } catch (error) {
+      assert.ok(error.message.includes('No assets found'));
+    }
+  });
+
   // Summary
   console.log('\n=== Test Summary ===');
   console.log(`Total: ${testsRun}`);
