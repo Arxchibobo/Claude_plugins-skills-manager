@@ -1,36 +1,90 @@
-# Fix: Security Vulnerabilities
+# Security Fixes & New Features
 
 ## Summary
-修复三个安全漏洞：命令注入 (RCE)、CORS 配置过于宽松、路径遍历。
 
-## Changes
+本次更新包含安全漏洞修复和新功能开发：
+1. 修复 3 个安全漏洞（命令注入、CSRF、路径遍历）
+2. 新增 Commands 和 Agents 管理页面
 
-### 1. Command Injection Prevention
-**问题：** 用户输入的 plugin name 直接拼接到 shell 命令中执行。
+---
 
-**修复：** 添加 `isValidPluginName()` 验证，只允许 `[a-zA-Z0-9_-]`。
+## 🔒 Security Fixes
 
-### 2. CORS & CSRF Protection
-**问题：** `Access-Control-Allow-Origin: *` 允许任何网站访问，且服务器仍会执行请求。
+### 1. Command Injection (RCE)
+| | |
+|---|---|
+| **风险等级** | 🔴 Critical |
+| **问题** | 用户输入直接拼接到 shell 命令执行 |
+| **修复** | 添加 `isValidPluginName()` 白名单验证 |
 
-**修复：** 
-- 限制 CORS 只允许 localhost
-- 对非 GET 请求验证 Origin，拒绝未授权来源
+### 2. CORS & CSRF
+| | |
+|---|---|
+| **风险等级** | 🔴 High |
+| **问题** | `Access-Control-Allow-Origin: *` 允许任意网站调用 API |
+| **修复** | 限制 localhost + 拦截非法 Origin 的 POST/DELETE |
 
-### 3. Path Traversal Prevention
-**问题：** 静态文件服务可被 `/../../../etc/passwd` 利用读取系统文件。
+### 3. Path Traversal
+| | |
+|---|---|
+| **风险等级** | 🟡 Medium |
+| **问题** | 静态文件服务可读取系统任意文件 |
+| **修复** | 验证路径必须在项目目录内 |
 
-**修复：** 验证解析后的路径必须在项目目录内。
+### Security Test Results
 
-## Testing Results
+```bash
+# 命令注入 → 已拦截
+curl -X POST "localhost:3456/api/plugins/test;echo HACKED/update"
+# {"error":"Invalid plugin name"}
 
-| 测试 | 请求 | 结果 |
-|------|------|------|
-| 命令注入 | `POST /api/plugins/test;echo HACKED/update` | `{"error":"Invalid plugin name"}` ✅ |
-| CSRF | `POST` with `Origin: https://evil.com` | `{"error":"Origin not allowed"}` ✅ |
-| 路径遍历 | `GET /../../../etc/passwd` | `File not found` ✅ |
-| 正常功能 | `GET /api/plugins` | `{"plugins":[]}` ✅ |
+# CSRF → 已拦截  
+curl -X POST -H "Origin: https://evil.com" "localhost:3456/api/plugins/x/toggle"
+# {"error":"Origin not allowed"}
+
+# 路径遍历 → 已拦截
+curl "localhost:3456/../../../etc/passwd"
+# File not found
+```
+
+---
+
+## ✨ New Features
+
+### Commands Management
+- 读取 `~/.claude/commands/*.md`
+- 支持查看、创建、编辑、删除
+- 路径：`/api/commands`
+
+### Agents Management  
+- 读取 `~/.claude/agents/*.md`
+- 支持查看、创建、编辑、删除
+- 路径：`/api/agents`
+
+### UI Updates
+- 新增 Commands Tab
+- 新增 Agents Tab
+- Modal 支持 Markdown 编辑
+
+---
 
 ## Files Changed
-- `server.js`
-- `server-static.js`
+
+| 文件 | 改动 |
+|------|------|
+| `server-static.js` | +安全修复 +Commands/Agents API |
+| `server.js` | +安全修复 |
+| `app.js` | +Commands/Agents 前端逻辑 |
+| `index.html` | +Commands/Agents Tab UI |
+
+---
+
+## Screenshots
+
+**Commands Tab:**
+- 显示 `/leoninit` 等自定义命令
+- 支持 View/Edit/Delete 操作
+
+**Agents Tab:**
+- 显示自定义 agents
+- 支持 New Agent 创建

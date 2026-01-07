@@ -633,8 +633,10 @@
             background: var(--bg-primary);
             border-radius: 12px;
             padding: 24px;
-            max-width: 500px;
+            max-width: 700px;
             width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
             box-shadow: var(--shadow-lg);
         }
 
@@ -776,6 +778,8 @@
             <div class="tab-nav">
                 <button class="tab-button active" data-tab="plugins">Plugins</button>
                 <button class="tab-button" data-tab="skills">Skills</button>
+                <button class="tab-button" data-tab="commands">Commands</button>
+                <button class="tab-button" data-tab="agents">Agents</button>
             </div>
         </div>
 
@@ -870,6 +874,72 @@
             </div>
         </div>
         <!-- End Skills Tab -->
+
+        <!-- Commands Tab Content -->
+        <div id="commandsTab" class="tab-content">
+            <div class="toolbar">
+                <div class="toolbar-row">
+                    <div class="stats" style="margin: 0;">
+                        <div class="stat-item">
+                            <div class="stat-value" id="totalCommands">0</div>
+                            <div class="stat-label">Total Commands</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="newCommandBtn" style="margin-left: auto;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"/>
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        New Command
+                    </button>
+                </div>
+            </div>
+            <div class="toolbar">
+                <div class="toolbar-row">
+                    <input type="text" id="commandSearchInput" class="search-input" placeholder="Search commands...">
+                </div>
+            </div>
+            <div id="commandsContainer">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Loading commands...
+                </div>
+            </div>
+        </div>
+        <!-- End Commands Tab -->
+
+        <!-- Agents Tab Content -->
+        <div id="agentsTab" class="tab-content">
+            <div class="toolbar">
+                <div class="toolbar-row">
+                    <div class="stats" style="margin: 0;">
+                        <div class="stat-item">
+                            <div class="stat-value" id="totalAgents">0</div>
+                            <div class="stat-label">Total Agents</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="newAgentBtn" style="margin-left: auto;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"/>
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        New Agent
+                    </button>
+                </div>
+            </div>
+            <div class="toolbar">
+                <div class="toolbar-row">
+                    <input type="text" id="agentSearchInput" class="search-input" placeholder="Search agents...">
+                </div>
+            </div>
+            <div id="agentsContainer">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Loading agents...
+                </div>
+            </div>
+        </div>
+        <!-- End Agents Tab -->
 
     </div>
 
