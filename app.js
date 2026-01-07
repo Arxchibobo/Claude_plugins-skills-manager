@@ -26,11 +26,50 @@ let agentSearchQuery = '';
 // Initialize
 async function init() {
     try {
+        // Set first card as active
+        document.querySelector('.stat-card[data-tab="plugins"]').classList.add('active');
+        
         await loadPlugins();
         setupEventListeners();
         renderPlugins();
+        
+        // Load all stats in background
+        loadAllStats();
     } catch (error) {
         showToast('Failed to load: ' + error.message, 'error');
+    }
+}
+
+// Load all stats for dashboard
+async function loadAllStats() {
+    try {
+        // Load skills count
+        const skillsRes = await fetch(`${API_BASE}/api/skills`);
+        if (skillsRes.ok) {
+            const data = await skillsRes.json();
+            skills = data.skills;
+            document.getElementById('totalSkills').textContent = skills.length;
+            document.getElementById('userSkills').textContent = skills.filter(s => s.level === 'user').length;
+            document.getElementById('projectSkills').textContent = skills.filter(s => s.level === 'project').length;
+        }
+        
+        // Load commands count
+        const commandsRes = await fetch(`${API_BASE}/api/commands`);
+        if (commandsRes.ok) {
+            const data = await commandsRes.json();
+            commands = data.commands;
+            document.getElementById('totalCommands').textContent = commands.length;
+        }
+        
+        // Load agents count
+        const agentsRes = await fetch(`${API_BASE}/api/agents`);
+        if (agentsRes.ok) {
+            const data = await agentsRes.json();
+            agents = data.agents;
+            document.getElementById('totalAgents').textContent = agents.length;
+        }
+    } catch (error) {
+        console.error('Error loading stats:', error);
     }
 }
 
@@ -63,11 +102,6 @@ function updateStats() {
 
 // Setup event listeners
 function setupEventListeners() {
-    // Tab switching
-    document.querySelectorAll('.tab-button').forEach(btn => {
-        btn.addEventListener('click', () => switchTab(btn.dataset.tab));
-    });
-
     // Plugins search
     document.getElementById('searchInput').addEventListener('input', (e) => {
         searchQuery = e.target.value.toLowerCase();
@@ -122,9 +156,9 @@ function setupEventListeners() {
 function switchTab(tab) {
     currentTab = tab;
 
-    // Update tab buttons
-    document.querySelectorAll('.tab-button').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.tab === tab);
+    // Update stat cards
+    document.querySelectorAll('.stat-card').forEach(card => {
+        card.classList.toggle('active', card.dataset.tab === tab);
     });
 
     // Update tab content
@@ -141,14 +175,10 @@ function switchTab(tab) {
         }
     } else if (tab === 'commands') {
         document.getElementById('commandsTab').classList.add('active');
-        if (commands.length === 0) {
-            loadCommands().then(() => renderCommands());
-        }
+        renderCommands();
     } else if (tab === 'agents') {
         document.getElementById('agentsTab').classList.add('active');
-        if (agents.length === 0) {
-            loadAgents().then(() => renderAgents());
-        }
+        renderAgents();
     }
 }
 

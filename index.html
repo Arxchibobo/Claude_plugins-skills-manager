@@ -88,34 +88,171 @@
             color: var(--text-primary);
         }
 
-        /* Tab Navigation */
-        .tab-nav {
-            display: flex;
-            gap: 8px;
-            margin-top: 20px;
-            border-bottom: 2px solid var(--border-primary);
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-top: 24px;
         }
 
-        .tab-button {
-            padding: 12px 24px;
-            background: none;
-            border: none;
-            border-bottom: 2px solid transparent;
+        /* Stat Card */
+        .stat-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-primary);
+            border-radius: 12px;
+            padding: 20px;
             cursor: pointer;
-            font-size: 15px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .stat-card:hover::before {
+            opacity: 1;
+        }
+
+        .stat-card.active {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 1px var(--color-primary);
+        }
+
+        .stat-card.active::before {
+            opacity: 1;
+        }
+
+        /* Theme Colors */
+        .theme-blue::before { background: linear-gradient(90deg, #3B82F6, #60A5FA); }
+        .theme-blue .icon-box { background: rgba(59, 130, 246, 0.1); }
+        .theme-blue .icon-box svg { stroke: #3B82F6; }
+        .theme-blue .main-count { color: #3B82F6; }
+        .theme-blue:hover { border-color: rgba(59, 130, 246, 0.3); }
+
+        .theme-green::before { background: linear-gradient(90deg, #10B981, #34D399); }
+        .theme-green .icon-box { background: rgba(16, 185, 129, 0.1); }
+        .theme-green .icon-box svg { stroke: #10B981; }
+        .theme-green .main-count { color: #10B981; }
+        .theme-green:hover { border-color: rgba(16, 185, 129, 0.3); }
+
+        .theme-purple::before { background: linear-gradient(90deg, #8B5CF6, #A78BFA); }
+        .theme-purple .icon-box { background: rgba(139, 92, 246, 0.1); }
+        .theme-purple .icon-box svg { stroke: #8B5CF6; }
+        .theme-purple .main-count { color: #8B5CF6; }
+        .theme-purple:hover { border-color: rgba(139, 92, 246, 0.3); }
+
+        .theme-orange::before { background: linear-gradient(90deg, #F59E0B, #FBBF24); }
+        .theme-orange .icon-box { background: rgba(245, 158, 11, 0.1); }
+        .theme-orange .icon-box svg { stroke: #F59E0B; }
+        .theme-orange .main-count { color: #F59E0B; }
+        .theme-orange:hover { border-color: rgba(245, 158, 11, 0.3); }
+
+        /* Card Header */
+        .stat-card .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .stat-card .icon-box {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.3s;
+        }
+
+        .stat-card:hover .icon-box {
+            transform: scale(1.1);
+        }
+
+        .stat-card .icon-box svg {
+            width: 22px;
+            height: 22px;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .stat-card .card-title {
+            font-size: 14px;
             font-weight: 500;
             color: var(--text-secondary);
-            transition: all 0.2s ease;
-            margin-bottom: -2px;
         }
 
-        .tab-button:hover {
-            color: var(--color-primary);
+        /* Main Count */
+        .stat-card .main-count {
+            font-size: 36px;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 12px;
         }
 
-        .tab-button.active {
-            color: var(--color-primary);
-            border-bottom-color: var(--color-primary);
+        /* Sub Stats */
+        .stat-card .sub-stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            border-top: 1px solid var(--border-primary);
+            padding-top: 12px;
+        }
+
+        .stat-card .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .stat-card .stat-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        .stat-card .stat-dot.enabled { background: #10B981; }
+        .stat-card .stat-dot.disabled { background: #94A3B8; }
+
+        .stat-card .stat-val {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 640px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Tab Navigation - Hidden, using cards instead */
+        .tab-nav {
+            display: none;
         }
 
         .tab-content {
@@ -756,30 +893,89 @@
                             <path d="M15 3v18"/>
                         </svg>
                     </div>
-                    <h1>Plugins & Skills Manager</h1>
-                </div>
-                <div class="stats">
-                    <div class="stat-item">
-                        <div class="stat-value" id="totalPlugins">0</div>
-                        <div class="stat-label">Total</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value" id="enabledPlugins">0</div>
-                        <div class="stat-label">Enabled</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value" id="disabledPlugins">0</div>
-                        <div class="stat-label">Disabled</div>
-                    </div>
+                    <h1>Claude Code Manager</h1>
                 </div>
             </div>
 
-            <!-- Tab Navigation -->
-            <div class="tab-nav">
-                <button class="tab-button active" data-tab="plugins">Plugins</button>
-                <button class="tab-button" data-tab="skills">Skills</button>
-                <button class="tab-button" data-tab="commands">Commands</button>
-                <button class="tab-button" data-tab="agents">Agents</button>
+            <!-- Stats Cards Grid -->
+            <div class="stats-grid">
+                <!-- Plugins Card -->
+                <div class="stat-card theme-blue" data-tab="plugins" onclick="switchTab('plugins')">
+                    <div class="card-header">
+                        <div class="icon-box">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                            </svg>
+                        </div>
+                        <span class="card-title">Plugins</span>
+                    </div>
+                    <div class="main-count" id="totalPlugins">0</div>
+                    <div class="sub-stats">
+                        <div class="stat-item">
+                            <span class="stat-dot enabled"></span>
+                            <span class="stat-val" id="enabledPlugins">0</span> Enabled
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-dot disabled"></span>
+                            <span class="stat-val" id="disabledPlugins">0</span> Disabled
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Skills Card -->
+                <div class="stat-card theme-green" data-tab="skills" onclick="switchTab('skills')">
+                    <div class="card-header">
+                        <div class="icon-box">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+                            </svg>
+                        </div>
+                        <span class="card-title">Skills</span>
+                    </div>
+                    <div class="main-count" id="totalSkills">0</div>
+                    <div class="sub-stats">
+                        <div class="stat-item">
+                            <span class="stat-val" id="userSkills">0</span> User
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-val" id="projectSkills">0</span> Project
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Commands Card -->
+                <div class="stat-card theme-purple" data-tab="commands" onclick="switchTab('commands')">
+                    <div class="card-header">
+                        <div class="icon-box">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M4 17l6-6-6-6M12 19h8"></path>
+                            </svg>
+                        </div>
+                        <span class="card-title">Commands</span>
+                    </div>
+                    <div class="main-count" id="totalCommands">0</div>
+                    <div class="sub-stats">
+                        <div class="stat-item">Slash commands</div>
+                    </div>
+                </div>
+
+                <!-- Agents Card -->
+                <div class="stat-card theme-orange" data-tab="agents" onclick="switchTab('agents')">
+                    <div class="card-header">
+                        <div class="icon-box">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="11" width="18" height="10" rx="2"></rect>
+                                <circle cx="12" cy="5" r="2"></circle>
+                                <path d="M12 7v4"></path>
+                            </svg>
+                        </div>
+                        <span class="card-title">Agents</span>
+                    </div>
+                    <div class="main-count" id="totalAgents">0</div>
+                    <div class="sub-stats">
+                        <div class="stat-item">Custom agents</div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -838,26 +1034,6 @@
 
         <!-- Skills Tab Content -->
         <div id="skillsTab" class="tab-content">
-            <!-- Skills Stats -->
-            <div class="toolbar">
-                <div class="toolbar-row">
-                    <div class="stats" style="margin: 0;">
-                        <div class="stat-item">
-                            <div class="stat-value" id="totalSkills">0</div>
-                            <div class="stat-label">Total Skills</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-value" id="userSkills">0</div>
-                            <div class="stat-label">User Skills</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-value" id="projectSkills">0</div>
-                            <div class="stat-label">Project Skills</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <!-- Skills Search -->
             <div class="toolbar">
                 <div class="toolbar-row">
@@ -879,24 +1055,14 @@
         <div id="commandsTab" class="tab-content">
             <div class="toolbar">
                 <div class="toolbar-row">
-                    <div class="stats" style="margin: 0;">
-                        <div class="stat-item">
-                            <div class="stat-value" id="totalCommands">0</div>
-                            <div class="stat-label">Total Commands</div>
-                        </div>
-                    </div>
-                    <button class="btn btn-primary" id="newCommandBtn" style="margin-left: auto;">
+                    <input type="text" id="commandSearchInput" class="search-input" placeholder="Search commands...">
+                    <button class="btn btn-primary" id="newCommandBtn">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <line x1="12" y1="5" x2="12" y2="19"/>
                             <line x1="5" y1="12" x2="19" y2="12"/>
                         </svg>
                         New Command
                     </button>
-                </div>
-            </div>
-            <div class="toolbar">
-                <div class="toolbar-row">
-                    <input type="text" id="commandSearchInput" class="search-input" placeholder="Search commands...">
                 </div>
             </div>
             <div id="commandsContainer">
@@ -912,24 +1078,14 @@
         <div id="agentsTab" class="tab-content">
             <div class="toolbar">
                 <div class="toolbar-row">
-                    <div class="stats" style="margin: 0;">
-                        <div class="stat-item">
-                            <div class="stat-value" id="totalAgents">0</div>
-                            <div class="stat-label">Total Agents</div>
-                        </div>
-                    </div>
-                    <button class="btn btn-primary" id="newAgentBtn" style="margin-left: auto;">
+                    <input type="text" id="agentSearchInput" class="search-input" placeholder="Search agents...">
+                    <button class="btn btn-primary" id="newAgentBtn">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <line x1="12" y1="5" x2="12" y2="19"/>
                             <line x1="5" y1="12" x2="19" y2="12"/>
                         </svg>
                         New Agent
                     </button>
-                </div>
-            </div>
-            <div class="toolbar">
-                <div class="toolbar-row">
-                    <input type="text" id="agentSearchInput" class="search-input" placeholder="Search agents...">
                 </div>
             </div>
             <div id="agentsContainer">
