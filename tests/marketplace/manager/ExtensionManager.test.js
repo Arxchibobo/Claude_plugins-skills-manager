@@ -399,6 +399,192 @@ async function runTests() {
     assert.strictEqual(loaded.isInstalled, false);
   });
 
+  // Test 14: Validate manifest with all required fields
+  await test('should validate manifest with all required fields', () => {
+    const manager = createTempRegistry();
+
+    const validManifest = {
+      type: 'plugin',
+      name: 'test-plugin',
+      version: '1.0.0',
+      description: 'Test plugin description',
+      author: 'test-author'
+    };
+
+    const result = manager.validateManifest(validManifest);
+
+    assert.strictEqual(result.valid, true);
+    assert.strictEqual(result.errors.length, 0);
+  });
+
+  // Test 15: Reject manifest missing required fields
+  await test('should reject manifest missing required fields', () => {
+    const manager = createTempRegistry();
+
+    const invalidManifest = {
+      type: 'plugin',
+      name: 'test-plugin'
+      // Missing: version, description, author
+    };
+
+    const result = manager.validateManifest(invalidManifest);
+
+    assert.strictEqual(result.valid, false);
+    assert.ok(result.errors.length > 0);
+    assert.ok(result.errors.some(e => e.includes('version')));
+    assert.ok(result.errors.some(e => e.includes('description')));
+    assert.ok(result.errors.some(e => e.includes('author')));
+  });
+
+  // Test 16: Reject invalid type
+  await test('should reject invalid extension type', () => {
+    const manager = createTempRegistry();
+
+    const invalidManifest = {
+      type: 'invalid-type',
+      name: 'test-plugin',
+      version: '1.0.0',
+      description: 'Test',
+      author: 'author'
+    };
+
+    const result = manager.validateManifest(invalidManifest);
+
+    assert.strictEqual(result.valid, false);
+    assert.ok(result.errors.some(e => e.includes('Invalid type')));
+  });
+
+  // Test 17: Reject invalid version format
+  await test('should reject invalid semver version', () => {
+    const manager = createTempRegistry();
+
+    const invalidManifest = {
+      type: 'plugin',
+      name: 'test-plugin',
+      version: 'not-a-version',
+      description: 'Test',
+      author: 'author'
+    };
+
+    const result = manager.validateManifest(invalidManifest);
+
+    assert.strictEqual(result.valid, false);
+    assert.ok(result.errors.some(e => e.includes('Invalid version format')));
+  });
+
+  // Test 18: Validate optional fields
+  await test('should validate optional fields correctly', () => {
+    const manager = createTempRegistry();
+
+    const manifest = {
+      type: 'plugin',
+      name: 'test-plugin',
+      version: '1.0.0',
+      description: 'Test',
+      author: 'author',
+      displayName: 'Test Plugin',
+      icon: 'icon.png',
+      repository: 'https://github.com/author/test',
+      engines: { 'claude-code': '^1.0.0' },
+      permissions: ['read', 'write'],
+      keywords: ['test', 'plugin']
+    };
+
+    const result = manager.validateManifest(manifest);
+
+    assert.strictEqual(result.valid, true);
+    assert.strictEqual(result.errors.length, 0);
+  });
+
+  // Test 19: Reject invalid optional field types
+  await test('should reject invalid optional field types', () => {
+    const manager = createTempRegistry();
+
+    const manifest = {
+      type: 'plugin',
+      name: 'test-plugin',
+      version: '1.0.0',
+      description: 'Test',
+      author: 'author',
+      permissions: 'not-an-array',
+      keywords: { invalid: 'object' }
+    };
+
+    const result = manager.validateManifest(manifest);
+
+    assert.strictEqual(result.valid, false);
+    assert.ok(result.errors.some(e => e.includes('permissions')));
+    assert.ok(result.errors.some(e => e.includes('keywords')));
+  });
+
+  // Test 20: Parse valid manifest JSON
+  await test('should parse valid manifest JSON', () => {
+    const manager = createTempRegistry();
+
+    const manifestJson = JSON.stringify({
+      type: 'skill',
+      name: 'test-skill',
+      version: '2.0.0',
+      description: 'Test skill',
+      author: 'author'
+    });
+
+    const result = manager.parseManifest(manifestJson);
+
+    assert.strictEqual(result.valid, true);
+    assert.ok(result.manifest);
+    assert.strictEqual(result.manifest.name, 'test-skill');
+  });
+
+  // Test 21: Reject invalid JSON
+  await test('should reject invalid JSON', () => {
+    const manager = createTempRegistry();
+
+    const invalidJson = '{ invalid json }';
+
+    const result = manager.parseManifest(invalidJson);
+
+    assert.strictEqual(result.valid, false);
+    assert.strictEqual(result.manifest, null);
+    assert.ok(result.errors.some(e => e.includes('Failed to parse JSON')));
+  });
+
+  // Test 22: Property Test - Manifest Required Fields Validation (Validates Requirement 8.2)
+  await test('Property: Manifest Required Fields Validation (Requirement 8.2)', () => {
+    const manager = createTempRegistry();
+
+    // Property: THE Extension_Manager SHALL validate that the manifest
+    // contains required fields: type, name, version, description, author
+
+    const requiredFields = ['type', 'name', 'version', 'description', 'author'];
+
+    requiredFields.forEach(field => {
+      const manifest = {
+        type: 'plugin',
+        name: 'test',
+        version: '1.0.0',
+        description: 'desc',
+        author: 'author'
+      };
+
+      // Remove one required field
+      delete manifest[field];
+
+      const result = manager.validateManifest(manifest);
+
+      assert.strictEqual(
+        result.valid,
+        false,
+        `Manifest without '${field}' should be invalid`
+      );
+
+      assert.ok(
+        result.errors.some(e => e.toLowerCase().includes(field)),
+        `Error message should mention missing field '${field}'`
+      );
+    });
+  });
+
   // Summary
   console.log('\n=== Test Summary ===');
   console.log(`Total: ${testsRun}`);
