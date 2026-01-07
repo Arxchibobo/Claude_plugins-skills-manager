@@ -165,8 +165,54 @@ async function getPlugins() {
     return plugins;
 }
 
-// Read skill.json file
+// Parse YAML frontmatter from SKILL.md
+function parseSkillMd(skillPath) {
+    try {
+        const mdPath = path.join(skillPath, 'SKILL.md');
+        if (fs.existsSync(mdPath)) {
+            const content = fs.readFileSync(mdPath, 'utf8');
+
+            // Parse YAML frontmatter
+            const frontmatterMatch = content.match(/^---\s*\r?\n([\s\S]*?)\r?\n---/);
+            if (frontmatterMatch) {
+                const frontmatter = frontmatterMatch[1];
+                const metadata = {};
+
+                // Simple YAML parser for name and description
+                const lines = frontmatter.split(/\r?\n/);
+                for (const line of lines) {
+                    const match = line.match(/^(\w+):\s*(.*)$/);
+                    if (match) {
+                        const key = match[1];
+                        const value = match[2].trim();
+                        if (value) {
+                            metadata[key] = value;
+                        }
+                    }
+                }
+
+                return {
+                    name: metadata.name || path.basename(skillPath),
+                    description: metadata.description || 'No description available',
+                    content: content // Store full content for README
+                };
+            }
+        }
+    } catch (error) {
+        console.error(`Error reading SKILL.md for ${skillPath}:`, error.message);
+    }
+    return null;
+}
+
+// Read skill.json or SKILL.md file
 function readSkillJson(skillPath) {
+    // First try SKILL.md (new format)
+    const skillMd = parseSkillMd(skillPath);
+    if (skillMd) {
+        return skillMd;
+    }
+
+    // Fallback to skill.json (old format)
     try {
         const jsonPath = path.join(skillPath, 'skill.json');
         if (fs.existsSync(jsonPath)) {
@@ -296,14 +342,21 @@ async function handleRequest(req, res) {
                 const skill = skills.find(s => s.id === skillId);
 
                 if (skill) {
-                    // Read full skill details including README if available
+                    // Read full skill details including SKILL.md or README.md
                     try {
-                        const readmePath = path.join(skill.path, 'README.md');
-                        if (fs.existsSync(readmePath)) {
-                            skill.readme = fs.readFileSync(readmePath, 'utf8');
+                        // Try SKILL.md first (new format)
+                        const skillMdPath = path.join(skill.path, 'SKILL.md');
+                        if (fs.existsSync(skillMdPath)) {
+                            skill.readme = fs.readFileSync(skillMdPath, 'utf8');
+                        } else {
+                            // Fallback to README.md (old format)
+                            const readmePath = path.join(skill.path, 'README.md');
+                            if (fs.existsSync(readmePath)) {
+                                skill.readme = fs.readFileSync(readmePath, 'utf8');
+                            }
                         }
                     } catch (error) {
-                        console.error('Error reading skill README:', error);
+                        console.error('Error reading skill documentation:', error);
                     }
 
                     res.writeHead(200, { 'Content-Type': 'application/json' });
