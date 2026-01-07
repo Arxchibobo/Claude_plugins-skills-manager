@@ -1372,6 +1372,19 @@ function filterMarketplaceExtensions() {
 async function showExtensionDetail(ext) {
     selectedExtension = ext;
 
+    // Show panel immediately with loading state
+    document.getElementById('detailPanelOverlay').classList.add('show');
+    document.getElementById('detailPanel').classList.add('open');
+
+    const detailHeader = document.getElementById('detailPanelHeader');
+    const detailBody = document.getElementById('detailPanelBody');
+    const detailActions = document.getElementById('detailPanelActions');
+
+    // Show loading state
+    detailHeader.innerHTML = '<div style="text-align: center; padding: 40px;">Loading...</div>';
+    detailBody.innerHTML = '<div class="loading"><div class="spinner"></div>Loading extension details...</div>';
+    detailActions.innerHTML = '';
+
     // Fetch full details
     try {
         const response = await fetch(`${API_BASE}/api/marketplace/extensions/${encodeURIComponent(ext.id)}`);
