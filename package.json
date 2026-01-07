@@ -1,0 +1,34 @@
+{
+  "name": "claude-plugins-skills-manager",
+  "version": "1.0.0",
+  "description": "Visual management tool for Claude Code plugins and skills. Browse, enable/disable, update, and manage all your plugins and skills through an intuitive web interface.",
+  "main": "server-static.js",
+  "scripts": {
+    "start": "node server-static.js",
+    "dev": "node server-static.js"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "plugin",
+    "plugin-manager",
+    "skills-manager",
+    "ui",
+    "visualization",
+    "management",
+    "tools"
+  ],
+  "author": "Arxchibobo",
+  "license": "MIT",
+  "homepage": "https://github.com/Arxchibobo/Claude_plugins-skills-manager",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Arxchibobo/Claude_plugins-skills-manager.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Arxchibobo/Claude_plugins-skills-manager/issues"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
