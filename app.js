@@ -23,6 +23,13 @@ let commandSearchQuery = '';
 let agents = [];
 let agentSearchQuery = '';
 
+// Marketplace state
+let marketplaceExtensions = [];
+let marketplaceSearchQuery = '';
+let marketplaceTypeFilter = 'all';
+let marketplaceCategory = 'featured';
+let selectedExtension = null;
+
 // Initialize
 async function init() {
     try {
@@ -179,6 +186,11 @@ function switchTab(tab) {
     } else if (tab === 'agents') {
         document.getElementById('agentsTab').classList.add('active');
         renderAgents();
+    } else if (tab === 'marketplace') {
+        document.getElementById('marketplaceTab').classList.add('active');
+        if (marketplaceExtensions.length === 0) {
+            loadMarketplaceExtensions();
+        }
     }
 }
 
@@ -1200,4 +1212,472 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// =====================
+// MARKETPLACE FUNCTIONS
+// =====================
+
+// Load marketplace extensions
+async function loadMarketplaceExtensions() {
+    try {
+        const response = await fetch(`${API_BASE}/api/marketplace/extensions`);
+        if (!response.ok) throw new Error('Failed to load marketplace');
+
+        const data = await response.json();
+        marketplaceExtensions = data.extensions;
+
+        // Update stats
+        const installed = marketplaceExtensions.filter(e => e.isInstalled);
+        const updates = installed.filter(e => e.installedVersion !== e.version);
+
+        document.getElementById('totalMarketplaceExtensions').textContent = marketplaceExtensions.length;
+        document.getElementById('installedExtensions').textContent = installed.length;
+        document.getElementById('availableUpdates').textContent = updates.length;
+        document.getElementById('installedCount').textContent = installed.length;
+        document.getElementById('updatesCount').textContent = updates.length;
+
+        renderMarketplaceExtensions();
+        setupMarketplaceEventListeners();
+    } catch (error) {
+        console.error('Error loading marketplace:', error);
+        showToast('Failed to load marketplace: ' + error.message, 'error');
+        document.getElementById('marketplaceExtensionGrid').innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">⚠️</div>
+                <p>Failed to load marketplace</p>
+            </div>
+        `;
+    }
+}
+
+// Render marketplace extensions
+function renderMarketplaceExtensions() {
+    const filtered = filterMarketplaceExtensions();
+    const grid = document.getElementById('marketplaceExtensionGrid');
+
+    if (filtered.length === 0) {
+        grid.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">📦</div>
+                <p>No extensions found</p>
+            </div>
+        `;
+        return;
+    }
+
+    grid.innerHTML = filtered.map(ext => createExtensionCard(ext)).join('');
+
+    // Attach click handlers
+    grid.querySelectorAll('.extension-card').forEach((card, index) => {
+        card.addEventListener('click', () => showExtensionDetail(filtered[index]));
+    });
+}
+
+// Create extension card HTML
+function createExtensionCard(ext) {
+    const badges = [];
+
+    // Official/Community badge
+    if (ext.isOfficial) {
+        badges.push('<span class="extension-badge official">Official</span>');
+    } else {
+        badges.push('<span class="extension-badge community">Community</span>');
+    }
+
+    // Installed badge
+    if (ext.isInstalled) {
+        badges.push('<span class="extension-badge installed">Installed</span>');
+    }
+
+    // Update badge
+    if (ext.isInstalled && ext.installedVersion !== ext.version) {
+        badges.push('<span class="extension-badge update">Update Available</span>');
+    }
+
+    const icon = ext.type === 'plugin' ? '🔌' :
+                 ext.type === 'skill' ? '⚡' :
+                 ext.type === 'command' ? '⌘' :
+                 ext.type === 'agent' ? '🤖' : '📦';
+
+    return `
+        <div class="extension-card">
+            <div class="extension-icon">${icon}</div>
+            <div class="extension-card-header">
+                <div class="extension-badges">
+                    ${badges.join('')}
+                </div>
+            </div>
+            <div class="extension-name">${escapeHtml(ext.name)}</div>
+            <div class="extension-author">by ${escapeHtml(ext.author || 'Unknown')}</div>
+            <div class="extension-description">${escapeHtml(ext.description || 'No description')}</div>
+            <div class="extension-meta">
+                <div class="extension-meta-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    </svg>
+                    ${ext.stars || 0}
+                </div>
+                <div class="extension-meta-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    ${ext.downloads || 0}
+                </div>
+                <div class="extension-meta-item">v${ext.version || '1.0.0'}</div>
+            </div>
+        </div>
+    `;
+}
+
+// Filter marketplace extensions
+function filterMarketplaceExtensions() {
+    let filtered = [...marketplaceExtensions];
+
+    // Category filter
+    if (marketplaceCategory === 'featured') {
+        filtered = filtered.filter(e => e.isOfficial);
+    } else if (marketplaceCategory === 'popular') {
+        filtered = filtered.sort((a, b) => (b.stars || 0) - (a.stars || 0));
+    } else if (marketplaceCategory === 'recent') {
+        filtered = filtered.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+    } else if (marketplaceCategory === 'installed') {
+        filtered = filtered.filter(e => e.isInstalled);
+    } else if (marketplaceCategory === 'updates') {
+        filtered = filtered.filter(e => e.isInstalled && e.installedVersion !== e.version);
+    }
+
+    // Type filter
+    if (marketplaceTypeFilter !== 'all') {
+        filtered = filtered.filter(e => e.type === marketplaceTypeFilter);
+    }
+
+    // Search filter
+    if (marketplaceSearchQuery) {
+        const query = marketplaceSearchQuery.toLowerCase();
+        filtered = filtered.filter(e =>
+            e.name.toLowerCase().includes(query) ||
+            (e.description && e.description.toLowerCase().includes(query)) ||
+            (e.author && e.author.toLowerCase().includes(query))
+        );
+    }
+
+    return filtered;
+}
+
+// Show extension detail panel
+async function showExtensionDetail(ext) {
+    selectedExtension = ext;
+
+    // Fetch full details
+    try {
+        const response = await fetch(`${API_BASE}/api/marketplace/extensions/${encodeURIComponent(ext.id)}`);
+        if (!response.ok) throw new Error('Failed to load extension details');
+
+        const fullExt = await response.json();
+
+        // Render detail panel
+        const detailHeader = document.getElementById('detailPanelHeader');
+        const detailBody = document.getElementById('detailPanelBody');
+        const detailActions = document.getElementById('detailPanelActions');
+
+        const icon = fullExt.type === 'plugin' ? '🔌' :
+                     fullExt.type === 'skill' ? '⚡' :
+                     fullExt.type === 'command' ? '⌘' :
+                     fullExt.type === 'agent' ? '🤖' : '📦';
+
+        detailHeader.innerHTML = `
+            <div class="extension-icon" style="margin-bottom: 12px;">${icon}</div>
+            <div class="extension-name" style="font-size: 20px;">${escapeHtml(fullExt.name)}</div>
+            <div class="extension-author">by ${escapeHtml(fullExt.author || 'Unknown')}</div>
+            <div class="extension-badges" style="margin-top: 12px;">
+                ${fullExt.isOfficial ? '<span class="extension-badge official">Official</span>' : '<span class="extension-badge community">Community</span>'}
+                ${fullExt.isInstalled ? '<span class="extension-badge installed">Installed</span>' : ''}
+                ${fullExt.isInstalled && fullExt.installedVersion !== fullExt.version ? '<span class="extension-badge update">Update Available</span>' : ''}
+            </div>
+        `;
+
+        detailBody.innerHTML = `
+            <div class="detail-section">
+                <h3>Description</h3>
+                <p>${escapeHtml(fullExt.description || 'No description')}</p>
+            </div>
+
+            <div class="detail-section">
+                <h3>Information</h3>
+                <div style="display: grid; gap: 8px; font-size: 14px;">
+                    <div><strong>Version:</strong> ${fullExt.version || '1.0.0'}</div>
+                    <div><strong>Type:</strong> ${fullExt.type}</div>
+                    <div><strong>Stars:</strong> ${fullExt.stars || 0}</div>
+                    <div><strong>Downloads:</strong> ${fullExt.downloads || 0}</div>
+                    ${fullExt.isInstalled ? `<div><strong>Installed Version:</strong> ${fullExt.installedVersion}</div>` : ''}
+                </div>
+            </div>
+
+            ${fullExt.readme ? `
+                <div class="detail-section">
+                    <h3>README</h3>
+                    <div style="max-height: 400px; overflow-y: auto; padding: 12px; background: var(--bg-secondary); border-radius: 8px; font-size: 13px;">
+                        <pre style="white-space: pre-wrap; word-wrap: break-word;">${escapeHtml(fullExt.readme)}</pre>
+                    </div>
+                </div>
+            ` : ''}
+        `;
+
+        // Render action buttons
+        if (fullExt.isInstalled) {
+            if (fullExt.installedVersion !== fullExt.version) {
+                detailActions.innerHTML = `
+                    <button class="btn btn-primary" style="flex: 1;" onclick="updateExtension()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                        </svg>
+                        Update to v${fullExt.version}
+                    </button>
+                    <button class="btn btn-danger" onclick="uninstallExtension()">Uninstall</button>
+                `;
+            } else {
+                detailActions.innerHTML = `
+                    <button class="btn btn-danger" style="flex: 1;" onclick="uninstallExtension()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                        Uninstall
+                    </button>
+                `;
+            }
+        } else {
+            detailActions.innerHTML = `
+                <button class="btn btn-primary" style="flex: 1;" onclick="installExtension()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Install
+                </button>
+            `;
+        }
+
+        // Show panel
+        document.getElementById('detailPanelOverlay').classList.add('show');
+        document.getElementById('detailPanel').classList.add('open');
+
+    } catch (error) {
+        console.error('Error loading extension details:', error);
+        showToast('Failed to load extension details', 'error');
+    }
+}
+
+// Close detail panel
+function closeDetailPanel() {
+    document.getElementById('detailPanelOverlay').classList.remove('show');
+    document.getElementById('detailPanel').classList.remove('open');
+    selectedExtension = null;
+}
+
+// Install extension
+async function installExtension() {
+    if (!selectedExtension) return;
+
+    // Show confirmation for community extensions
+    if (!selectedExtension.isOfficial) {
+        const confirmed = await showConfirmModal(
+            'Install Community Extension',
+            `Are you sure you want to install "${selectedExtension.name}"? Community extensions are not verified by Claude Code and may contain security risks.`
+        );
+
+        if (!confirmed) return;
+    }
+
+    try {
+        // Get download URL from latest release
+        const response = await fetch(`${API_BASE}/api/marketplace/extensions/${encodeURIComponent(selectedExtension.id)}`);
+        if (!response.ok) throw new Error('Failed to fetch extension details');
+
+        const fullExt = await response.json();
+
+        if (!fullExt.latestRelease) {
+            throw new Error('No releases available for this extension');
+        }
+
+        const asset = fullExt.latestRelease.assets.find(a => a.name.endsWith('.zip'));
+        if (!asset) {
+            throw new Error('No installable package found');
+        }
+
+        // Construct manifest
+        const manifest = {
+            type: fullExt.type,
+            name: fullExt.name,
+            version: fullExt.version,
+            description: fullExt.description,
+            author: fullExt.author
+        };
+
+        // Install
+        const installResponse = await fetch(`${API_BASE}/api/marketplace/install`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id: selectedExtension.id,
+                version: fullExt.version,
+                downloadUrl: asset.browser_download_url,
+                manifest
+            })
+        });
+
+        if (!installResponse.ok) {
+            const error = await installResponse.json();
+            throw new Error(error.error || 'Installation failed');
+        }
+
+        showToast('Extension installed successfully', 'success');
+        closeDetailPanel();
+
+        // Reload marketplace
+        await loadMarketplaceExtensions();
+
+    } catch (error) {
+        console.error('Error installing extension:', error);
+        showToast('Failed to install: ' + error.message, 'error');
+    }
+}
+
+// Uninstall extension
+async function uninstallExtension() {
+    if (!selectedExtension) return;
+
+    const confirmed = await showConfirmModal(
+        'Uninstall Extension',
+        `Are you sure you want to uninstall "${selectedExtension.name}"?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/marketplace/extensions/${encodeURIComponent(selectedExtension.id)}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) throw new Error('Uninstallation failed');
+
+        showToast('Extension uninstalled successfully', 'success');
+        closeDetailPanel();
+
+        // Reload marketplace
+        await loadMarketplaceExtensions();
+
+    } catch (error) {
+        console.error('Error uninstalling extension:', error);
+        showToast('Failed to uninstall: ' + error.message, 'error');
+    }
+}
+
+// Update extension
+async function updateExtension() {
+    // Update is same as install - it will replace the existing version
+    await installExtension();
+}
+
+// Setup marketplace event listeners
+function setupMarketplaceEventListeners() {
+    // Category navigation
+    document.querySelectorAll('#marketplaceCategoryNav .sidebar-nav-item').forEach(item => {
+        item.addEventListener('click', () => {
+            document.querySelectorAll('#marketplaceCategoryNav .sidebar-nav-item').forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+            marketplaceCategory = item.dataset.category;
+            renderMarketplaceExtensions();
+        });
+    });
+
+    // Type filters
+    document.querySelectorAll('#marketplaceTypeFilters .type-pill').forEach(pill => {
+        pill.addEventListener('click', () => {
+            document.querySelectorAll('#marketplaceTypeFilters .type-pill').forEach(p => p.classList.remove('active'));
+            pill.classList.add('active');
+            marketplaceTypeFilter = pill.dataset.type;
+            renderMarketplaceExtensions();
+        });
+    });
+
+    // Search input
+    const searchInput = document.getElementById('marketplaceSearchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            marketplaceSearchQuery = e.target.value;
+            setTimeout(() => {
+                if (marketplaceSearchQuery === e.target.value) {
+                    renderMarketplaceExtensions();
+                }
+            }, 300);
+        });
+    }
+
+    // Detail panel close
+    document.getElementById('detailPanelClose').addEventListener('click', closeDetailPanel);
+    document.getElementById('detailPanelOverlay').addEventListener('click', closeDetailPanel);
+
+    // URL import
+    document.getElementById('urlImportBtn')?.addEventListener('click', () => {
+        const url = document.getElementById('urlImportInput').value.trim();
+        if (!url) {
+            showToast('Please enter a GitHub URL', 'error');
+            return;
+        }
+        importFromURL(url);
+    });
+}
+
+// Import from GitHub URL
+async function importFromURL(url) {
+    try {
+        // Validate URL format
+        if (!url.includes('github.com')) {
+            throw new Error('Please enter a valid GitHub URL');
+        }
+
+        showToast('Importing from URL...', 'info');
+
+        // This would call the URL import endpoint
+        // For now, show a message
+        showToast('URL import feature coming soon', 'info');
+
+    } catch (error) {
+        console.error('Error importing from URL:', error);
+        showToast('Failed to import: ' + error.message, 'error');
+    }
+}
+
+// Show confirm modal (returns promise)
+function showConfirmModal(title, message) {
+    return new Promise((resolve) => {
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
+        const modalFooter = document.querySelector('.modal-footer');
+
+        modalTitle.textContent = title;
+        modalBody.textContent = message;
+
+        modalFooter.innerHTML = `
+            <button class="btn btn-secondary" id="tempModalCancel">Cancel</button>
+            <button class="btn btn-danger" id="tempModalConfirm">Confirm</button>
+        `;
+
+        document.getElementById('tempModalCancel').addEventListener('click', () => {
+            hideModal();
+            resolve(false);
+        });
+
+        document.getElementById('tempModalConfirm').addEventListener('click', () => {
+            hideModal();
+            resolve(true);
+        });
+
+        showModal();
+    });
 }
