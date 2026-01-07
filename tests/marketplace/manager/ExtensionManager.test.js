@@ -585,6 +585,177 @@ async function runTests() {
     });
   });
 
+  // Test 23: Validate safe extraction paths (Zip Slip protection)
+  await test('should validate safe extraction paths', () => {
+    const manager = createTempRegistry();
+    const targetDir = '/home/user/extensions';
+
+    // Safe paths
+    assert.strictEqual(manager.validateExtractPath('plugin/index.js', targetDir), true);
+    assert.strictEqual(manager.validateExtractPath('subfolder/file.txt', targetDir), true);
+    assert.strictEqual(manager.validateExtractPath('README.md', targetDir), true);
+
+    // Unsafe paths (directory traversal)
+    assert.strictEqual(manager.validateExtractPath('../etc/passwd', targetDir), false);
+    assert.strictEqual(manager.validateExtractPath('../../root/.ssh/id_rsa', targetDir), false);
+    assert.strictEqual(manager.validateExtractPath('/etc/passwd', targetDir), false);
+  });
+
+  // Test 24: Check version compatibility (semver)
+  await test('should check version compatibility with caret range', () => {
+    const manager = createTempRegistry();
+
+    // Caret (^) - compatible changes
+    assert.strictEqual(manager.checkVersionCompatibility('^1.0.0', '1.0.0'), true);
+    assert.strictEqual(manager.checkVersionCompatibility('^1.0.0', '1.2.5'), true);
+    assert.strictEqual(manager.checkVersionCompatibility('^1.0.0', '1.9.9'), true);
+    assert.strictEqual(manager.checkVersionCompatibility('^1.0.0', '2.0.0'), false);
+    assert.strictEqual(manager.checkVersionCompatibility('^1.0.0', '0.9.0'), false);
+  });
+
+  // Test 25: Check version compatibility (tilde range)
+  await test('should check version compatibility with tilde range', () => {
+    const manager = createTempRegistry();
+
+    // Tilde (~) - patch-level changes only
+    assert.strictEqual(manager.checkVersionCompatibility('~1.2.0', '1.2.0'), true);
+    assert.strictEqual(manager.checkVersionCompatibility('~1.2.0', '1.2.5'), true);
+    assert.strictEqual(manager.checkVersionCompatibility('~1.2.0', '1.3.0'), false);
+    assert.strictEqual(manager.checkVersionCompatibility('~1.2.0', '2.0.0'), false);
+  });
+
+  // Test 26: Check version compatibility (exact and wildcard)
+  await test('should check version compatibility with exact match and wildcard', () => {
+    const manager = createTempRegistry();
+
+    // Exact match
+    assert.strictEqual(manager.checkVersionCompatibility('1.0.0', '1.0.0'), true);
+    assert.strictEqual(manager.checkVersionCompatibility('1.0.0', '1.0.1'), false);
+
+    // Wildcard
+    assert.strictEqual(manager.checkVersionCompatibility('*', '1.0.0'), true);
+    assert.strictEqual(manager.checkVersionCompatibility('*', '99.99.99'), true);
+  });
+
+  // Test 27: Check existing extension
+  await test('should check if extension already exists', async () => {
+    const manager = createTempRegistry();
+    await manager.initialize();
+
+    const ext = new Extension({
+      name: 'existing-plugin',
+      owner: { login: 'author' },
+      html_url: 'https://github.com/author/existing-plugin',
+      topics: ['claude-code-plugin']
+    }, { isInstalled: true, installedVersion: '1.0.0' });
+
+    await manager.addExtension(ext);
+
+    const result = manager.checkExistingExtension('author/existing-plugin');
+
+    assert.ok(result);
+    assert.strictEqual(result.exists, true);
+    assert.ok(result.message.includes('1.0.0'));
+
+    // Non-existent extension
+    const notFound = manager.checkExistingExtension('author/nonexistent');
+    assert.strictEqual(notFound, null);
+  });
+
+  // Test 28: Validate GitHub URLs (SSRF protection)
+  await test('should validate GitHub URLs and reject non-github.com', () => {
+    const manager = createTempRegistry();
+
+    // Valid GitHub URLs
+    const valid1 = manager.validateGitHubURL('https://github.com/owner/repo');
+    assert.strictEqual(valid1.valid, true);
+    assert.strictEqual(valid1.owner, 'owner');
+    assert.strictEqual(valid1.repo, 'repo');
+
+    const valid2 = manager.validateGitHubURL('https://github.com/owner/repo.git');
+    assert.strictEqual(valid2.valid, true);
+    assert.strictEqual(valid2.repo, 'repo'); // .git removed
+
+    // Invalid URLs (SSRF protection)
+    const invalid1 = manager.validateGitHubURL('https://evil.com/owner/repo');
+    assert.strictEqual(invalid1.valid, false);
+    assert.ok(invalid1.error.includes('Only github.com URLs are allowed'));
+
+    const invalid2 = manager.validateGitHubURL('https://github.com.evil.com/owner/repo');
+    assert.strictEqual(invalid2.valid, false);
+
+    const invalid3 = manager.validateGitHubURL('not-a-url');
+    assert.strictEqual(invalid3.valid, false);
+  });
+
+  // Test 29: Property Test - GitHub URL Parsing (Validates Requirement 6.1)
+  await test('Property: GitHub URL Parsing (Requirement 6.1)', () => {
+    const manager = createTempRegistry();
+
+    // Property: WHEN a user enters a GitHub repository URL,
+    // THE Extension_Manager SHALL use URL parser validation to ensure
+    // the hostname is exactly `github.com`
+
+    const testCases = [
+      { url: 'https://github.com/test/repo', shouldPass: true },
+      { url: 'https://github.com/test/repo.git', shouldPass: true },
+      { url: 'https://attacker.com/test/repo', shouldPass: false },
+      { url: 'https://github.com.evil.com/test/repo', shouldPass: false },
+      { url: 'http://github.com/test/repo', shouldPass: true }, // http also parsed correctly
+    ];
+
+    testCases.forEach(({ url, shouldPass }) => {
+      const result = manager.validateGitHubURL(url);
+
+      if (shouldPass) {
+        const parsed = new URL(url);
+        assert.strictEqual(
+          parsed.hostname === 'github.com',
+          result.valid,
+          `URL ${url} should be validated correctly`
+        );
+      } else {
+        assert.strictEqual(
+          result.valid,
+          false,
+          `URL ${url} should be rejected`
+        );
+      }
+    });
+  });
+
+  // Test 30: Property Test - Invalid URL Rejection (Validates Requirement 6.5)
+  await test('Property: Invalid URL Rejection (Requirement 6.5)', () => {
+    const manager = createTempRegistry();
+
+    // Property: IF the URL format is invalid or hostname is not github.com,
+    // THEN THE Marketplace SHALL display the error
+    // "Invalid GitHub URL format. Only github.com URLs are allowed"
+
+    const invalidUrls = [
+      'not-a-url',
+      'ftp://github.com/test/repo',
+      'https://gitlab.com/test/repo',
+      'https://evil.com/test/repo',
+      'https://github.com', // No owner/repo
+    ];
+
+    invalidUrls.forEach(url => {
+      const result = manager.validateGitHubURL(url);
+
+      assert.strictEqual(
+        result.valid,
+        false,
+        `Invalid URL ${url} should be rejected`
+      );
+
+      assert.ok(
+        result.error,
+        `Error message should be provided for ${url}`
+      );
+    });
+  });
+
   // Summary
   console.log('\n=== Test Summary ===');
   console.log(`Total: ${testsRun}`);
