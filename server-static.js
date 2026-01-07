@@ -225,7 +225,30 @@ function readSkillJson(skillPath) {
     return null;
 }
 
-// Get all skills (both user-level and project-level)
+// Get skills from settings.json
+function getSettingsSkills() {
+    try {
+        const settings = readSettings();
+        const settingsSkills = settings.skills || [];
+
+        return settingsSkills.map(skill => ({
+            id: skill.id || skill.name,
+            name: skill.name,
+            displayName: skill.name.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+            description: skill.description || 'No description available',
+            location: skill.location || 'managed',
+            source: 'settings',
+            version: skill.version || '1.0.0',
+            author: skill.author || 'Anthropic',
+            tags: skill.tags || []
+        }));
+    } catch (error) {
+        console.error('Error reading skills from settings:', error);
+        return [];
+    }
+}
+
+// Get all skills (from filesystem and settings.json)
 async function getSkills() {
     const skills = [];
 
@@ -249,7 +272,8 @@ async function getSkills() {
                         name: entry.name,
                         displayName: skillJson.name || entry.name,
                         description: skillJson.description || 'No description available',
-                        level: level,
+                        location: level,
+                        source: 'filesystem',
                         path: skillPath,
                         version: skillJson.version || '1.0.0',
                         author: skillJson.author || 'Unknown',
@@ -269,6 +293,10 @@ async function getSkills() {
     // Scan project-level skills
     const projectSkills = scanSkillsDir(PROJECT_SKILLS_PATH, 'project');
     skills.push(...projectSkills);
+
+    // Get skills from settings.json
+    const settingsSkills = getSettingsSkills();
+    skills.push(...settingsSkills);
 
     return skills;
 }
@@ -343,20 +371,26 @@ async function handleRequest(req, res) {
 
                 if (skill) {
                     // Read full skill details including SKILL.md or README.md
-                    try {
-                        // Try SKILL.md first (new format)
-                        const skillMdPath = path.join(skill.path, 'SKILL.md');
-                        if (fs.existsSync(skillMdPath)) {
-                            skill.readme = fs.readFileSync(skillMdPath, 'utf8');
-                        } else {
-                            // Fallback to README.md (old format)
-                            const readmePath = path.join(skill.path, 'README.md');
-                            if (fs.existsSync(readmePath)) {
-                                skill.readme = fs.readFileSync(readmePath, 'utf8');
+                    // Only applicable for filesystem-based skills
+                    if (skill.source === 'filesystem' && skill.path) {
+                        try {
+                            // Try SKILL.md first (new format)
+                            const skillMdPath = path.join(skill.path, 'SKILL.md');
+                            if (fs.existsSync(skillMdPath)) {
+                                skill.readme = fs.readFileSync(skillMdPath, 'utf8');
+                            } else {
+                                // Fallback to README.md (old format)
+                                const readmePath = path.join(skill.path, 'README.md');
+                                if (fs.existsSync(readmePath)) {
+                                    skill.readme = fs.readFileSync(readmePath, 'utf8');
+                                }
                             }
+                        } catch (error) {
+                            console.error('Error reading skill documentation:', error);
                         }
-                    } catch (error) {
-                        console.error('Error reading skill documentation:', error);
+                    } else if (skill.source === 'settings') {
+                        // For settings-based skills, provide a note that they are managed by Claude Code
+                        skill.readme = `# ${skill.displayName}\n\n${skill.description}\n\n---\n\n**Location:** ${skill.location}\n**Source:** Claude Code Configuration\n\nThis skill is managed by Claude Code and configured in settings.json.`;
                     }
 
                     res.writeHead(200, { 'Content-Type': 'application/json' });
