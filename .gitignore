@@ -40,6 +40,9 @@ Desktop.ini
 # Serena MCP files
 .serena/
 
+# Kiro specs and config
+.kiro/
+
 # Temporary files
 *.tmp
 *.temp
