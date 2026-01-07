@@ -55,6 +55,11 @@ function writeSettings(settings) {
     }
 }
 
+// Validate plugin name (prevent command injection)
+function isValidPluginName(name) {
+    return /^[a-zA-Z0-9_-]+$/.test(name);
+}
+
 // Parse plugin ID
 function parsePluginId(fullId) {
     const parts = fullId.split('@');
@@ -205,8 +210,20 @@ async function execClaude(command) {
 
 // API Routes
 async function handleRequest(req, res) {
-    // Enable CORS
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    // Enable CORS (restrict to localhost only)
+    const allowedOrigins = ['http://localhost:3456', 'http://127.0.0.1:3456'];
+    const origin = req.headers.origin;
+    
+    // Block requests from unauthorized origins for state-changing methods (CSRF protection)
+    if (req.method !== 'GET' && origin && !allowedOrigins.includes(origin)) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Origin not allowed' }));
+        return;
+    }
+    
+    if (allowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+    }
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
@@ -317,6 +334,13 @@ async function handleRequest(req, res) {
             const pluginId = decodeURIComponent(url.split('/')[3]);
             const parsed = parsePluginId(pluginId);
 
+            // Validate plugin name to prevent command injection
+            if (!isValidPluginName(parsed.name)) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Invalid plugin name' }));
+                return;
+            }
+
             const result = await execClaude(`plugin update ${parsed.name}`);
 
             res.writeHead(result.success ? 200 : 500, { 'Content-Type': 'application/json' });
@@ -328,6 +352,13 @@ async function handleRequest(req, res) {
         if (method === 'DELETE' && url.match(/^\/api\/plugins\/[^/]+$/)) {
             const pluginId = decodeURIComponent(url.split('/')[3]);
             const parsed = parsePluginId(pluginId);
+
+            // Validate plugin name to prevent command injection
+            if (!isValidPluginName(parsed.name)) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Invalid plugin name' }));
+                return;
+            }
 
             const result = await execClaude(`plugin uninstall ${parsed.name}`);
 

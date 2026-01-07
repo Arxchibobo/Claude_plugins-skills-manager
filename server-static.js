@@ -44,6 +44,11 @@ function writeSettings(settings) {
     }
 }
 
+// Validate plugin name (prevent command injection)
+function isValidPluginName(name) {
+    return /^[a-zA-Z0-9_-]+$/.test(name);
+}
+
 // Parse plugin ID
 function parsePluginId(fullId) {
     const parts = fullId.split('@');
@@ -302,8 +307,20 @@ function serveStatic(req, res, filePath) {
 
 // Handle HTTP requests
 async function handleRequest(req, res) {
-    // Enable CORS
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    // Enable CORS (restrict to localhost only)
+    const allowedOrigins = ['http://localhost:3456', 'http://127.0.0.1:3456'];
+    const origin = req.headers.origin;
+    
+    // Block requests from unauthorized origins for state-changing methods (CSRF protection)
+    if (req.method !== 'GET' && origin && !allowedOrigins.includes(origin)) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Origin not allowed' }));
+        return;
+    }
+    
+    if (allowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+    }
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
@@ -447,6 +464,14 @@ async function handleRequest(req, res) {
             if (method === 'POST' && url.match(/^\/api\/plugins\/[^/]+\/update$/)) {
                 const pluginId = decodeURIComponent(url.split('/')[3]);
                 const parsed = parsePluginId(pluginId);
+                
+                // Validate plugin name to prevent command injection
+                if (!isValidPluginName(parsed.name)) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Invalid plugin name' }));
+                    return;
+                }
+                
                 const result = await execClaude(`plugin update ${parsed.name}`);
                 res.writeHead(result.success ? 200 : 500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify(result));
@@ -457,6 +482,14 @@ async function handleRequest(req, res) {
             if (method === 'DELETE' && url.match(/^\/api\/plugins\/[^/]+$/)) {
                 const pluginId = decodeURIComponent(url.split('/')[3]);
                 const parsed = parsePluginId(pluginId);
+                
+                // Validate plugin name to prevent command injection
+                if (!isValidPluginName(parsed.name)) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Invalid plugin name' }));
+                    return;
+                }
+                
                 const result = await execClaude(`plugin uninstall ${parsed.name}`);
 
                 if (result.success) {
@@ -496,7 +529,16 @@ async function handleRequest(req, res) {
         if (url === '/') {
             filePath = path.join(filePath, 'index.html');
         } else {
-            filePath = path.join(filePath, url);
+            // Prevent path traversal attacks
+            const safeSuffix = path.normalize(url).replace(/^(\.\.[\/\\])+/, '');
+            filePath = path.join(__dirname, safeSuffix);
+            
+            // Ensure the resolved path is within the project directory
+            if (!filePath.startsWith(__dirname)) {
+                res.writeHead(403);
+                res.end('Forbidden');
+                return;
+            }
         }
 
         serveStatic(req, res, filePath);
