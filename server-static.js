@@ -10,6 +10,8 @@ const PORT = 3456;
 const SETTINGS_PATH = path.join(process.env.USERPROFILE || process.env.HOME, '.claude', 'settings.json');
 const USER_SKILLS_PATH = path.join(process.env.USERPROFILE || process.env.HOME, '.claude', 'skills');
 const PROJECT_SKILLS_PATH = path.join(process.cwd(), '.claude', 'skills');
+const USER_COMMANDS_PATH = path.join(process.env.USERPROFILE || process.env.HOME, '.claude', 'commands');
+const USER_AGENTS_PATH = path.join(process.env.USERPROFILE || process.env.HOME, '.claude', 'agents');
 
 // MIME types
 const MIME_TYPES = {
@@ -278,6 +280,90 @@ async function getSkills() {
     return skills;
 }
 
+// Get all commands
+async function getCommands() {
+    const commands = [];
+    
+    if (!fs.existsSync(USER_COMMANDS_PATH)) {
+        return commands;
+    }
+
+    const entries = fs.readdirSync(USER_COMMANDS_PATH, { withFileTypes: true });
+    
+    for (const entry of entries) {
+        if (entry.isFile() && entry.name.endsWith('.md') && !entry.name.startsWith('.')) {
+            const filePath = path.join(USER_COMMANDS_PATH, entry.name);
+            const content = fs.readFileSync(filePath, 'utf8');
+            const name = entry.name.replace('.md', '');
+            
+            // Extract description from first line or frontmatter
+            let description = 'No description';
+            const lines = content.split('\n');
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (trimmed && !trimmed.startsWith('#') && !trimmed.startsWith('---')) {
+                    description = trimmed.substring(0, 100);
+                    break;
+                }
+            }
+            
+            commands.push({
+                id: name,
+                name: name,
+                displayName: name.charAt(0).toUpperCase() + name.slice(1),
+                description: description,
+                path: filePath,
+                size: content.length,
+                lines: lines.length
+            });
+        }
+    }
+    
+    return commands;
+}
+
+// Get all agents
+async function getAgents() {
+    const agents = [];
+    
+    if (!fs.existsSync(USER_AGENTS_PATH)) {
+        return agents;
+    }
+
+    const entries = fs.readdirSync(USER_AGENTS_PATH, { withFileTypes: true });
+    
+    for (const entry of entries) {
+        if (entry.isFile() && entry.name.endsWith('.md') && !entry.name.startsWith('.')) {
+            const filePath = path.join(USER_AGENTS_PATH, entry.name);
+            const content = fs.readFileSync(filePath, 'utf8');
+            const name = entry.name.replace('.md', '');
+            
+            // Extract description from first line or frontmatter
+            let description = 'No description';
+            const lines = content.split('\n');
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (trimmed && !trimmed.startsWith('#') && !trimmed.startsWith('---')) {
+                    description = trimmed.substring(0, 100);
+                    break;
+                }
+            }
+            
+            agents.push({
+                id: name,
+                name: name,
+                displayName: name.charAt(0).toUpperCase() + name.slice(1),
+                description: description,
+                path: filePath,
+                size: content.length,
+                lines: lines.length
+            });
+        }
+    }
+    
+    return agents;
+}
+
 // Execute Claude CLI command
 async function execClaude(command) {
     try {
@@ -349,6 +435,156 @@ async function handleRequest(req, res) {
                 const skills = await getSkills();
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ skills }));
+                return;
+            }
+
+            // GET /api/commands
+            if (method === 'GET' && url === '/api/commands') {
+                const commands = await getCommands();
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ commands }));
+                return;
+            }
+
+            // GET /api/commands/:id
+            if (method === 'GET' && url.match(/^\/api\/commands\/[^/]+$/)) {
+                const commandId = decodeURIComponent(url.split('/')[3]);
+                const commands = await getCommands();
+                const command = commands.find(c => c.id === commandId);
+
+                if (command) {
+                    command.content = fs.readFileSync(command.path, 'utf8');
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify(command));
+                } else {
+                    res.writeHead(404, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Command not found' }));
+                }
+                return;
+            }
+
+            // POST /api/commands/:id - Create or update command
+            if (method === 'POST' && url.match(/^\/api\/commands\/[^/]+$/)) {
+                const commandId = decodeURIComponent(url.split('/')[3]);
+                
+                // Validate command name
+                if (!/^[a-zA-Z0-9_-]+$/.test(commandId)) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Invalid command name' }));
+                    return;
+                }
+
+                let body = '';
+                req.on('data', chunk => body += chunk);
+                req.on('end', () => {
+                    try {
+                        const { content } = JSON.parse(body);
+                        const filePath = path.join(USER_COMMANDS_PATH, `${commandId}.md`);
+                        
+                        // Ensure directory exists
+                        if (!fs.existsSync(USER_COMMANDS_PATH)) {
+                            fs.mkdirSync(USER_COMMANDS_PATH, { recursive: true });
+                        }
+                        
+                        fs.writeFileSync(filePath, content, 'utf8');
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ success: true }));
+                    } catch (error) {
+                        res.writeHead(500, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ error: error.message }));
+                    }
+                });
+                return;
+            }
+
+            // DELETE /api/commands/:id
+            if (method === 'DELETE' && url.match(/^\/api\/commands\/[^/]+$/)) {
+                const commandId = decodeURIComponent(url.split('/')[3]);
+                const filePath = path.join(USER_COMMANDS_PATH, `${commandId}.md`);
+                
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: true }));
+                } else {
+                    res.writeHead(404, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Command not found' }));
+                }
+                return;
+            }
+
+            // GET /api/agents
+            if (method === 'GET' && url === '/api/agents') {
+                const agents = await getAgents();
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ agents }));
+                return;
+            }
+
+            // GET /api/agents/:id
+            if (method === 'GET' && url.match(/^\/api\/agents\/[^/]+$/)) {
+                const agentId = decodeURIComponent(url.split('/')[3]);
+                const agents = await getAgents();
+                const agent = agents.find(a => a.id === agentId);
+
+                if (agent) {
+                    agent.content = fs.readFileSync(agent.path, 'utf8');
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify(agent));
+                } else {
+                    res.writeHead(404, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Agent not found' }));
+                }
+                return;
+            }
+
+            // POST /api/agents/:id - Create or update agent
+            if (method === 'POST' && url.match(/^\/api\/agents\/[^/]+$/)) {
+                const agentId = decodeURIComponent(url.split('/')[3]);
+                
+                // Validate agent name
+                if (!/^[a-zA-Z0-9_-]+$/.test(agentId)) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Invalid agent name' }));
+                    return;
+                }
+
+                let body = '';
+                req.on('data', chunk => body += chunk);
+                req.on('end', () => {
+                    try {
+                        const { content } = JSON.parse(body);
+                        const filePath = path.join(USER_AGENTS_PATH, `${agentId}.md`);
+                        
+                        // Ensure directory exists
+                        if (!fs.existsSync(USER_AGENTS_PATH)) {
+                            fs.mkdirSync(USER_AGENTS_PATH, { recursive: true });
+                        }
+                        
+                        fs.writeFileSync(filePath, content, 'utf8');
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ success: true }));
+                    } catch (error) {
+                        res.writeHead(500, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ error: error.message }));
+                    }
+                });
+                return;
+            }
+
+            // DELETE /api/agents/:id
+            if (method === 'DELETE' && url.match(/^\/api\/agents\/[^/]+$/)) {
+                const agentId = decodeURIComponent(url.split('/')[3]);
+                const filePath = path.join(USER_AGENTS_PATH, `${agentId}.md`);
+                
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: true }));
+                } else {
+                    res.writeHead(404, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Agent not found' }));
+                }
                 return;
             }
 

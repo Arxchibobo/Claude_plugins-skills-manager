@@ -15,6 +15,14 @@ let skills = [];
 let skillSearchQuery = '';
 let currentTab = 'plugins';
 
+// Commands state
+let commands = [];
+let commandSearchQuery = '';
+
+// Agents state
+let agents = [];
+let agentSearchQuery = '';
+
 // Initialize
 async function init() {
     try {
@@ -72,6 +80,24 @@ function setupEventListeners() {
         renderSkills();
     });
 
+    // Commands search
+    document.getElementById('commandSearchInput').addEventListener('input', (e) => {
+        commandSearchQuery = e.target.value.toLowerCase();
+        renderCommands();
+    });
+
+    // Agents search
+    document.getElementById('agentSearchInput').addEventListener('input', (e) => {
+        agentSearchQuery = e.target.value.toLowerCase();
+        renderAgents();
+    });
+
+    // New command button
+    document.getElementById('newCommandBtn').addEventListener('click', () => showEditModal('command', null));
+
+    // New agent button
+    document.getElementById('newAgentBtn').addEventListener('click', () => showEditModal('agent', null));
+
     // Filter buttons
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -112,6 +138,16 @@ function switchTab(tab) {
         document.getElementById('skillsTab').classList.add('active');
         if (skills.length === 0) {
             loadSkills().then(() => renderSkills());
+        }
+    } else if (tab === 'commands') {
+        document.getElementById('commandsTab').classList.add('active');
+        if (commands.length === 0) {
+            loadCommands().then(() => renderCommands());
+        }
+    } else if (tab === 'agents') {
+        document.getElementById('agentsTab').classList.add('active');
+        if (agents.length === 0) {
+            loadAgents().then(() => renderAgents());
         }
     }
 }
@@ -722,6 +758,11 @@ function showConfirmModal(title, message, onConfirm) {
     });
 }
 
+// Show modal
+function showModal() {
+    document.getElementById('confirmModal').classList.add('show');
+}
+
 // Hide modal
 function hideModal() {
     document.getElementById('confirmModal').classList.remove('show');
@@ -761,3 +802,372 @@ function showToast(message, type = 'info') {
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', init);
+
+// Load commands
+async function loadCommands() {
+    try {
+        const response = await fetch(`${API_BASE}/api/commands`);
+        if (!response.ok) throw new Error('Cannot connect to server');
+
+        const data = await response.json();
+        commands = data.commands;
+        document.getElementById('totalCommands').textContent = commands.length;
+    } catch (error) {
+        console.error('Error loading commands:', error);
+        throw error;
+    }
+}
+
+// Render commands
+function renderCommands() {
+    const container = document.getElementById('commandsContainer');
+
+    let filtered = commands.filter(cmd => {
+        if (commandSearchQuery) {
+            const searchText = `${cmd.name} ${cmd.description}`.toLowerCase();
+            if (!searchText.includes(commandSearchQuery)) return false;
+        }
+        return true;
+    });
+
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">📝</div>
+                <div>No commands found</div>
+                <div style="margin-top: 10px; color: var(--text-tertiary);">Click "New Command" to create one</div>
+            </div>
+        `;
+        return;
+    }
+
+    let html = `
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 200px;">Name</th>
+                        <th>Description</th>
+                        <th style="width: 100px;">Lines</th>
+                        <th style="width: 150px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    filtered.forEach(cmd => {
+        html += `
+            <tr>
+                <td>
+                    <div class="plugin-name">/${cmd.name}</div>
+                </td>
+                <td>
+                    <div class="plugin-description">${cmd.description}</div>
+                </td>
+                <td>${cmd.lines}</td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="action-btn" onclick="viewCommand('${cmd.id}')">View</button>
+                        <button class="action-btn" onclick="editCommand('${cmd.id}')">Edit</button>
+                        <button class="action-btn danger" onclick="deleteCommand('${cmd.id}')">Delete</button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+}
+
+// View command
+async function viewCommand(commandId) {
+    try {
+        const response = await fetch(`${API_BASE}/api/commands/${encodeURIComponent(commandId)}`);
+        if (!response.ok) throw new Error('Cannot load command');
+
+        const command = await response.json();
+
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
+        const modalFooter = document.querySelector('.modal-footer');
+
+        modalTitle.textContent = `/${command.name}`;
+        modalBody.innerHTML = `
+            <div style="text-align: left;">
+                <p><strong>Path:</strong> <code style="font-size: 12px;">${command.path}</code></p>
+                <hr style="margin: 15px 0; border: none; border-top: 1px solid var(--border-primary);">
+                <pre style="background: var(--bg-secondary); padding: 15px; border-radius: 6px; overflow-x: auto; font-size: 13px; line-height: 1.5; max-height: 400px; overflow-y: auto;">${escapeHtml(command.content)}</pre>
+            </div>
+        `;
+
+        modalFooter.innerHTML = '<button class="btn btn-secondary" id="modalCloseBtn">Close</button>';
+        document.getElementById('modalCloseBtn').addEventListener('click', hideModal);
+
+        showModal();
+    } catch (error) {
+        showToast('Failed to load command: ' + error.message, 'error');
+    }
+}
+
+// Edit command
+async function editCommand(commandId) {
+    try {
+        const response = await fetch(`${API_BASE}/api/commands/${encodeURIComponent(commandId)}`);
+        if (!response.ok) throw new Error('Cannot load command');
+
+        const command = await response.json();
+        showEditModal('command', command);
+    } catch (error) {
+        showToast('Failed to load command: ' + error.message, 'error');
+    }
+}
+
+// Delete command
+function deleteCommand(commandId) {
+    showConfirmModal(
+        'Delete Command',
+        `Are you sure you want to delete /${commandId}?`,
+        async () => {
+            try {
+                const response = await fetch(`${API_BASE}/api/commands/${encodeURIComponent(commandId)}`, {
+                    method: 'DELETE'
+                });
+                if (!response.ok) throw new Error('Delete failed');
+
+                commands = commands.filter(c => c.id !== commandId);
+                document.getElementById('totalCommands').textContent = commands.length;
+                renderCommands();
+                showToast('Command deleted', 'success');
+            } catch (error) {
+                showToast('Failed to delete: ' + error.message, 'error');
+            }
+        }
+    );
+}
+
+// Load agents
+async function loadAgents() {
+    try {
+        const response = await fetch(`${API_BASE}/api/agents`);
+        if (!response.ok) throw new Error('Cannot connect to server');
+
+        const data = await response.json();
+        agents = data.agents;
+        document.getElementById('totalAgents').textContent = agents.length;
+    } catch (error) {
+        console.error('Error loading agents:', error);
+        throw error;
+    }
+}
+
+// Render agents
+function renderAgents() {
+    const container = document.getElementById('agentsContainer');
+
+    let filtered = agents.filter(agent => {
+        if (agentSearchQuery) {
+            const searchText = `${agent.name} ${agent.description}`.toLowerCase();
+            if (!searchText.includes(agentSearchQuery)) return false;
+        }
+        return true;
+    });
+
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">🤖</div>
+                <div>No agents found</div>
+                <div style="margin-top: 10px; color: var(--text-tertiary);">Click "New Agent" to create one</div>
+            </div>
+        `;
+        return;
+    }
+
+    let html = `
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 200px;">Name</th>
+                        <th>Description</th>
+                        <th style="width: 100px;">Lines</th>
+                        <th style="width: 150px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    filtered.forEach(agent => {
+        html += `
+            <tr>
+                <td>
+                    <div class="plugin-name">@${agent.name}</div>
+                </td>
+                <td>
+                    <div class="plugin-description">${agent.description}</div>
+                </td>
+                <td>${agent.lines}</td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="action-btn" onclick="viewAgent('${agent.id}')">View</button>
+                        <button class="action-btn" onclick="editAgent('${agent.id}')">Edit</button>
+                        <button class="action-btn danger" onclick="deleteAgent('${agent.id}')">Delete</button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+}
+
+// View agent
+async function viewAgent(agentId) {
+    try {
+        const response = await fetch(`${API_BASE}/api/agents/${encodeURIComponent(agentId)}`);
+        if (!response.ok) throw new Error('Cannot load agent');
+
+        const agent = await response.json();
+
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
+        const modalFooter = document.querySelector('.modal-footer');
+
+        modalTitle.textContent = `@${agent.name}`;
+        modalBody.innerHTML = `
+            <div style="text-align: left;">
+                <p><strong>Path:</strong> <code style="font-size: 12px;">${agent.path}</code></p>
+                <hr style="margin: 15px 0; border: none; border-top: 1px solid var(--border-primary);">
+                <pre style="background: var(--bg-secondary); padding: 15px; border-radius: 6px; overflow-x: auto; font-size: 13px; line-height: 1.5; max-height: 400px; overflow-y: auto;">${escapeHtml(agent.content)}</pre>
+            </div>
+        `;
+
+        modalFooter.innerHTML = '<button class="btn btn-secondary" id="modalCloseBtn">Close</button>';
+        document.getElementById('modalCloseBtn').addEventListener('click', hideModal);
+
+        showModal();
+    } catch (error) {
+        showToast('Failed to load agent: ' + error.message, 'error');
+    }
+}
+
+// Edit agent
+async function editAgent(agentId) {
+    try {
+        const response = await fetch(`${API_BASE}/api/agents/${encodeURIComponent(agentId)}`);
+        if (!response.ok) throw new Error('Cannot load agent');
+
+        const agent = await response.json();
+        showEditModal('agent', agent);
+    } catch (error) {
+        showToast('Failed to load agent: ' + error.message, 'error');
+    }
+}
+
+// Delete agent
+function deleteAgent(agentId) {
+    showConfirmModal(
+        'Delete Agent',
+        `Are you sure you want to delete @${agentId}?`,
+        async () => {
+            try {
+                const response = await fetch(`${API_BASE}/api/agents/${encodeURIComponent(agentId)}`, {
+                    method: 'DELETE'
+                });
+                if (!response.ok) throw new Error('Delete failed');
+
+                agents = agents.filter(a => a.id !== agentId);
+                document.getElementById('totalAgents').textContent = agents.length;
+                renderAgents();
+                showToast('Agent deleted', 'success');
+            } catch (error) {
+                showToast('Failed to delete: ' + error.message, 'error');
+            }
+        }
+    );
+}
+
+// Show edit modal for command/agent
+function showEditModal(type, item) {
+    const isNew = !item;
+    const title = isNew ? `New ${type.charAt(0).toUpperCase() + type.slice(1)}` : `Edit ${type.charAt(0).toUpperCase() + type.slice(1)}`;
+    
+    const modalTitle = document.getElementById('modalTitle');
+    const modalBody = document.getElementById('modalBody');
+    const modalFooter = document.querySelector('.modal-footer');
+
+    modalTitle.textContent = title;
+    modalBody.innerHTML = `
+        <div style="text-align: left;">
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600;">Name</label>
+                <input type="text" id="editName" value="${item ? item.name : ''}" 
+                       placeholder="my-${type}" 
+                       style="width: 100%; padding: 10px; border: 1px solid var(--border-primary); border-radius: 6px; font-size: 14px;"
+                       ${item ? 'disabled' : ''}>
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 5px; font-weight: 600;">Content (Markdown)</label>
+                <textarea id="editContent" 
+                          placeholder="Enter ${type} content..."
+                          style="width: 100%; height: 300px; padding: 10px; border: 1px solid var(--border-primary); border-radius: 6px; font-size: 13px; font-family: monospace; resize: vertical;">${item ? escapeHtml(item.content) : ''}</textarea>
+            </div>
+        </div>
+    `;
+
+    modalFooter.innerHTML = `
+        <button class="btn btn-secondary" id="modalCancelBtn">Cancel</button>
+        <button class="btn btn-primary" id="modalSaveBtn">Save</button>
+    `;
+
+    document.getElementById('modalCancelBtn').addEventListener('click', hideModal);
+    document.getElementById('modalSaveBtn').addEventListener('click', async () => {
+        const name = document.getElementById('editName').value.trim();
+        const content = document.getElementById('editContent').value;
+
+        if (!name) {
+            showToast('Name is required', 'error');
+            return;
+        }
+
+        if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+            showToast('Name can only contain letters, numbers, - and _', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE}/api/${type}s/${encodeURIComponent(name)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content })
+            });
+
+            if (!response.ok) throw new Error('Save failed');
+
+            hideModal();
+            showToast(`${type.charAt(0).toUpperCase() + type.slice(1)} saved`, 'success');
+
+            // Reload data
+            if (type === 'command') {
+                await loadCommands();
+                renderCommands();
+            } else {
+                await loadAgents();
+                renderAgents();
+            }
+        } catch (error) {
+            showToast('Failed to save: ' + error.message, 'error');
+        }
+    });
+
+    showModal();
+}
+
+// Escape HTML
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
