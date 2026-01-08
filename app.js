@@ -66,9 +66,13 @@ async function loadAllStats() {
         if (skillsRes.ok) {
             const data = await skillsRes.json();
             skills = data.skills;
+            const userSkills = skills.filter(s => s.location === 'user').length;
+            const projectSkills = skills.filter(s => s.location === 'project').length;
+            const managedSkills = skills.filter(s => s.location === 'managed').length;
+
             document.getElementById('totalSkills').textContent = skills.length;
-            document.getElementById('userSkills').textContent = skills.filter(s => s.level === 'user').length;
-            document.getElementById('projectSkills').textContent = skills.filter(s => s.level === 'project').length;
+            document.getElementById('userSkills').textContent = userSkills;
+            document.getElementById('projectSkills').textContent = `${projectSkills} / ${managedSkills} managed`;
         }
         
         // Load commands count
@@ -216,7 +220,25 @@ function switchTab(tab) {
     } else if (tab === 'skills') {
         document.getElementById('skillsTab').classList.add('active');
         if (skills.length === 0) {
-            loadSkills().then(() => renderSkills());
+            loadSkills()
+                .then(() => renderSkills())
+                .catch(error => {
+                    console.error('Failed to load skills:', error);
+                    const container = document.getElementById('skillsContainer');
+                    container.innerHTML = `
+                        <div class="error-state">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="8" x2="12" y2="12"></line>
+                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                            </svg>
+                            <p>Failed to load skills</p>
+                            <button class="btn btn-primary" onclick="location.reload()">Retry</button>
+                        </div>
+                    `;
+                });
+        } else {
+            renderSkills();
         }
     } else if (tab === 'commands') {
         document.getElementById('commandsTab').classList.add('active');
