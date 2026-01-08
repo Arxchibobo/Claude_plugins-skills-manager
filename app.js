@@ -30,6 +30,14 @@ let marketplaceTypeFilter = 'all';
 let marketplaceCategory = 'featured';
 let selectedExtension = null;
 
+// Security state
+let securityScans = [];
+let securityHistory = [];
+let currentScanResult = null;
+let activeScanId = null;
+let scanPollInterval = null;
+let securitySeverityFilter = 'all';
+
 // Initialize
 async function init() {
     try {
@@ -157,6 +165,33 @@ function setupEventListeners() {
 
     // Modal
     document.getElementById('modalCancel').addEventListener('click', () => hideModal());
+
+    // Security audit event listeners
+    document.getElementById('startFullScanBtn').addEventListener('click', () => showScanConfig());
+    document.getElementById('startReviewBtn').addEventListener('click', () => startCodeReview());
+    document.getElementById('viewHistoryBtn').addEventListener('click', () => showHistory());
+
+    document.getElementById('scanTypeSelect').addEventListener('change', (e) => {
+        const customPathInput = document.getElementById('customPathInput');
+        customPathInput.style.display = e.target.value === 'custom' ? 'block' : 'none';
+    });
+
+    document.getElementById('confirmScanBtn').addEventListener('click', () => startScan());
+    document.getElementById('cancelScanBtn').addEventListener('click', () => hideScanConfig());
+
+    // Security severity filter buttons
+    document.querySelectorAll('#scanResultsSection .filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('#scanResultsSection .filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            securitySeverityFilter = btn.dataset.severity;
+            renderScanResult(currentScanResult);
+        });
+    });
+
+    // Issue detail modal close buttons
+    document.getElementById('issueModalClose').addEventListener('click', () => hideIssueDetailModal());
+    document.getElementById('issueModalDismiss').addEventListener('click', () => hideIssueDetailModal());
 }
 
 // Switch tab
@@ -190,6 +225,11 @@ function switchTab(tab) {
         document.getElementById('marketplaceTab').classList.add('active');
         if (marketplaceExtensions.length === 0) {
             loadMarketplaceExtensions();
+        }
+    } else if (tab === 'security') {
+        document.getElementById('securityTab').classList.add('active');
+        if (securityHistory.length === 0) {
+            loadSecurityResults();
         }
     }
 }
@@ -1794,4 +1834,562 @@ function showConfirmModal(title, message) {
 
         showModal();
     });
+}
+
+// ==================== Security Audit Functions ====================
+
+// Load security results from history
+async function loadSecurityResults() {
+    try {
+        const response = await fetch(`${API_BASE}/api/security/history`);
+        if (!response.ok) throw new Error('Failed to load security history');
+
+        const data = await response.json();
+        securityHistory = data.records || [];
+        updateSecurityStats();
+
+        // Show empty state if no history
+        if (securityHistory.length === 0) {
+            document.getElementById('emptyState').style.display = 'block';
+            document.getElementById('scanResultsSection').style.display = 'none';
+            document.getElementById('historyView').style.display = 'none';
+            document.getElementById('activeScansSection').style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Failed to load security results:', error);
+        showToast('Failed to load security results', 'error');
+    }
+}
+
+// Update security statistics in stat card
+function updateSecurityStats() {
+    const totalScans = securityHistory.length;
+    const activeScansCount = securityScans.length;
+    const totalIssues = currentScanResult ?
+        (currentScanResult.issues || []).length : 0;
+
+    document.getElementById('totalSecurityScans').textContent = totalScans;
+    document.getElementById('activeScans').textContent = activeScansCount;
+    document.getElementById('totalIssues').textContent = totalIssues;
+}
+
+// Show scan configuration panel
+function showScanConfig() {
+    document.getElementById('scanConfigPanel').style.display = 'block';
+    document.getElementById('emptyState').style.display = 'none';
+}
+
+// Hide scan configuration panel
+function hideScanConfig() {
+    document.getElementById('scanConfigPanel').style.display = 'none';
+    document.getElementById('scanTypeSelect').value = 'full';
+    document.getElementById('customPathInput').style.display = 'none';
+    document.getElementById('scanPathInput').value = '';
+}
+
+// Start security scan
+async function startScan() {
+    try {
+        const scanType = document.getElementById('scanTypeSelect').value;
+        let scanPath = '.';
+
+        if (scanType === 'custom') {
+            scanPath = document.getElementById('scanPathInput').value.trim();
+            if (!scanPath) {
+                showToast('Please enter a custom path', 'error');
+                return;
+            }
+        }
+
+        hideScanConfig();
+
+        // Show active scans section
+        document.getElementById('activeScansSection').style.display = 'block';
+        document.getElementById('emptyState').style.display = 'none';
+
+        // Start scan
+        const response = await fetch(`${API_BASE}/api/security/scan`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: scanPath, scope: scanType })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to start scan');
+        }
+
+        const data = await response.json();
+        activeScanId = data.scanId;
+
+        // Add to active scans
+        securityScans.push({
+            id: data.scanId,
+            path: scanPath,
+            status: 'running',
+            progress: 0
+        });
+
+        renderActiveScan(data.scanId);
+        showToast('Security scan started', 'success');
+
+        // Start polling for status
+        pollScanStatus(data.scanId);
+
+    } catch (error) {
+        console.error('Failed to start scan:', error);
+        showToast(error.message || 'Failed to start scan', 'error');
+    }
+}
+
+// Render active scan progress
+function renderActiveScan(scanId) {
+    const scan = securityScans.find(s => s.id === scanId);
+    if (!scan) return;
+
+    const activeScansList = document.getElementById('activeScansList');
+
+    const scanCard = document.createElement('div');
+    scanCard.id = `scan-${scanId}`;
+    scanCard.style.cssText = 'background: var(--bg-primary); border: 1px solid var(--border-primary); border-radius: 12px; padding: 20px; margin-bottom: 16px;';
+
+    // Create header
+    const header = document.createElement('div');
+    header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;';
+
+    const info = document.createElement('div');
+    const pathDiv = document.createElement('div');
+    pathDiv.style.cssText = 'font-weight: 500; color: var(--text-primary);';
+    pathDiv.textContent = `Scanning: ${scan.path}`;
+
+    const statusDiv = document.createElement('div');
+    statusDiv.style.cssText = 'font-size: 13px; color: var(--text-secondary); margin-top: 4px;';
+    statusDiv.textContent = `Status: ${scan.status}`;
+
+    info.appendChild(pathDiv);
+    info.appendChild(statusDiv);
+
+    const progressText = document.createElement('div');
+    progressText.id = `progress-${scanId}`;
+    progressText.style.cssText = 'font-size: 24px; font-weight: 600; color: var(--color-primary);';
+    progressText.textContent = '0%';
+
+    header.appendChild(info);
+    header.appendChild(progressText);
+
+    // Create progress bar
+    const progressContainer = document.createElement('div');
+    progressContainer.style.cssText = 'height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden;';
+
+    const progressBar = document.createElement('div');
+    progressBar.id = `progressBar-${scanId}`;
+    progressBar.style.cssText = 'height: 100%; background: linear-gradient(90deg, #4F46E5, #7C3AED); width: 0%; transition: width 0.3s;';
+
+    progressContainer.appendChild(progressBar);
+
+    scanCard.appendChild(header);
+    scanCard.appendChild(progressContainer);
+    activeScansList.appendChild(scanCard);
+}
+
+// Update progress bar
+function updateProgress(scanId, progress) {
+    const progressText = document.getElementById(`progress-${scanId}`);
+    const progressBar = document.getElementById(`progressBar-${scanId}`);
+
+    if (progressText) {
+        progressText.textContent = `${Math.round(progress)}%`;
+    }
+    if (progressBar) {
+        progressBar.style.width = `${progress}%`;
+    }
+}
+
+// Poll scan status
+async function pollScanStatus(scanId) {
+    if (scanPollInterval) {
+        clearInterval(scanPollInterval);
+    }
+
+    scanPollInterval = setInterval(async () => {
+        try {
+            const response = await fetch(`${API_BASE}/api/security/scan/${scanId}`);
+            if (!response.ok) {
+                clearInterval(scanPollInterval);
+                return;
+            }
+
+            const data = await response.json();
+
+            // Update progress
+            if (data.progress !== undefined) {
+                updateProgress(scanId, data.progress);
+            }
+
+            // Check if scan is complete
+            if (data.status === 'completed') {
+                clearInterval(scanPollInterval);
+
+                // Remove from active scans
+                securityScans = securityScans.filter(s => s.id !== scanId);
+                const scanCard = document.getElementById(`scan-${scanId}`);
+                if (scanCard) scanCard.remove();
+
+                // Hide active scans if empty
+                if (securityScans.length === 0) {
+                    document.getElementById('activeScansSection').style.display = 'none';
+                }
+
+                // Load and display result
+                currentScanResult = data.result;
+                renderScanResult(data.result);
+
+                // Reload history
+                await loadSecurityResults();
+
+                showToast('Security scan completed', 'success');
+            } else if (data.status === 'failed') {
+                clearInterval(scanPollInterval);
+
+                // Remove from active scans
+                securityScans = securityScans.filter(s => s.id !== scanId);
+                const scanCard = document.getElementById(`scan-${scanId}`);
+                if (scanCard) scanCard.remove();
+
+                showToast('Security scan failed', 'error');
+            }
+
+        } catch (error) {
+            console.error('Failed to poll scan status:', error);
+            clearInterval(scanPollInterval);
+        }
+    }, 2000); // Poll every 2 seconds
+}
+
+// Render scan result
+function renderScanResult(result) {
+    if (!result) return;
+
+    currentScanResult = result;
+
+    // Hide empty state and history
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('historyView').style.display = 'none';
+
+    // Show results section
+    document.getElementById('scanResultsSection').style.display = 'block';
+
+    // Update severity counts
+    const issues = result.issues || [];
+    const criticalCount = issues.filter(i => i.severity === 'critical').length;
+    const highCount = issues.filter(i => i.severity === 'high').length;
+    const mediumCount = issues.filter(i => i.severity === 'medium').length;
+    const lowCount = issues.filter(i => i.severity === 'low').length;
+
+    document.getElementById('criticalCount').textContent = criticalCount;
+    document.getElementById('highCount').textContent = highCount;
+    document.getElementById('mediumCount').textContent = mediumCount;
+    document.getElementById('lowCount').textContent = lowCount;
+
+    // Filter and render issues
+    const filteredIssues = securitySeverityFilter === 'all'
+        ? issues
+        : issues.filter(i => i.severity === securitySeverityFilter);
+
+    const issuesList = document.getElementById('issuesList');
+    issuesList.innerHTML = '';
+
+    if (filteredIssues.length === 0) {
+        const emptyDiv = document.createElement('div');
+        emptyDiv.style.cssText = 'text-align: center; padding: 40px; color: var(--text-secondary);';
+        emptyDiv.textContent = 'No issues found';
+        issuesList.appendChild(emptyDiv);
+        return;
+    }
+
+    filteredIssues.forEach((issue, index) => {
+        const issueCard = createIssueCard(issue, index);
+        issuesList.appendChild(issueCard);
+    });
+
+    updateSecurityStats();
+}
+
+// Create issue card element
+function createIssueCard(issue, index) {
+    const issueCard = document.createElement('div');
+    issueCard.style.cssText = 'background: var(--bg-primary); border: 1px solid var(--border-primary); border-radius: 12px; padding: 20px; margin-bottom: 16px; cursor: pointer; transition: border-color 0.2s;';
+    issueCard.onmouseover = () => issueCard.style.borderColor = 'var(--color-primary)';
+    issueCard.onmouseout = () => issueCard.style.borderColor = 'var(--border-primary)';
+    issueCard.onclick = () => showIssueDetail(index);
+
+    const severityColors = {
+        critical: '#EF4444',
+        high: '#F97316',
+        medium: '#8B5CF6',
+        low: '#3B82F6'
+    };
+
+    // Create header
+    const header = document.createElement('div');
+    header.style.cssText = 'display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;';
+
+    const content = document.createElement('div');
+    content.style.flex = '1';
+
+    const badge = document.createElement('span');
+    badge.className = 'badge';
+    badge.style.cssText = `background: ${severityColors[issue.severity]}; color: white; font-size: 11px; padding: 4px 8px; border-radius: 4px; text-transform: uppercase;`;
+    badge.textContent = issue.severity;
+
+    const description = document.createElement('div');
+    description.style.cssText = 'font-weight: 500; color: var(--text-primary); margin-top: 8px;';
+    description.textContent = issue.description || 'Security issue detected';
+
+    content.appendChild(badge);
+    content.appendChild(description);
+
+    const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    arrow.setAttribute('width', '20');
+    arrow.setAttribute('height', '20');
+    arrow.setAttribute('viewBox', '0 0 24 24');
+    arrow.setAttribute('fill', 'none');
+    arrow.setAttribute('stroke', 'currentColor');
+    arrow.setAttribute('stroke-width', '2');
+    arrow.style.cssText = 'flex-shrink: 0; color: var(--text-tertiary);';
+    const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    polyline.setAttribute('points', '9 18 15 12 9 6');
+    arrow.appendChild(polyline);
+
+    header.appendChild(content);
+    header.appendChild(arrow);
+
+    // Create footer
+    const footer = document.createElement('div');
+    footer.style.cssText = 'display: flex; gap: 16px; font-size: 13px; color: var(--text-secondary);';
+
+    const fileInfo = document.createElement('div');
+    const fileIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    fileIcon.setAttribute('width', '14');
+    fileIcon.setAttribute('height', '14');
+    fileIcon.setAttribute('viewBox', '0 0 24 24');
+    fileIcon.setAttribute('fill', 'none');
+    fileIcon.setAttribute('stroke', 'currentColor');
+    fileIcon.setAttribute('stroke-width', '2');
+    fileIcon.style.cssText = 'vertical-align: middle; margin-right: 4px;';
+    const path1 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path1.setAttribute('d', 'M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z');
+    const polyline2 = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    polyline2.setAttribute('points', '13 2 13 9 20 9');
+    fileIcon.appendChild(path1);
+    fileIcon.appendChild(polyline2);
+
+    const fileText = document.createTextNode(issue.file || 'Unknown file');
+    fileInfo.appendChild(fileIcon);
+    fileInfo.appendChild(fileText);
+
+    footer.appendChild(fileInfo);
+
+    if (issue.line) {
+        const lineInfo = document.createElement('div');
+        lineInfo.textContent = `Line ${issue.line}`;
+        footer.appendChild(lineInfo);
+    }
+
+    issueCard.appendChild(header);
+    issueCard.appendChild(footer);
+
+    return issueCard;
+}
+
+// Show issue detail modal
+function showIssueDetail(issueIndex) {
+    if (!currentScanResult || !currentScanResult.issues) return;
+
+    const issue = currentScanResult.issues[issueIndex];
+    if (!issue) return;
+
+    const severityColors = {
+        critical: '#EF4444',
+        high: '#F97316',
+        medium: '#8B5CF6',
+        low: '#3B82F6'
+    };
+
+    // Update modal content
+    document.getElementById('issueModalTitle').textContent = 'Security Issue Details';
+    document.getElementById('issueSeverityBadge').textContent = issue.severity.toUpperCase();
+    document.getElementById('issueSeverityBadge').style.background = severityColors[issue.severity];
+    document.getElementById('issueDescription').textContent = issue.description || 'No description available';
+    document.getElementById('issueFile').textContent = issue.file || 'Unknown';
+    document.getElementById('issueLine').textContent = issue.line || 'N/A';
+
+    // Show/hide code snippet
+    if (issue.codeSnippet) {
+        document.getElementById('issueCodeSection').style.display = 'block';
+        document.getElementById('issueCodeSnippet').textContent = issue.codeSnippet;
+    } else {
+        document.getElementById('issueCodeSection').style.display = 'none';
+    }
+
+    // Show/hide recommendation
+    if (issue.recommendation) {
+        document.getElementById('issueRecommendationSection').style.display = 'block';
+        document.getElementById('issueRecommendation').textContent = issue.recommendation;
+    } else {
+        document.getElementById('issueRecommendationSection').style.display = 'none';
+    }
+
+    // Show modal
+    document.getElementById('issueDetailModal').style.display = 'flex';
+}
+
+// Hide issue detail modal
+function hideIssueDetailModal() {
+    document.getElementById('issueDetailModal').style.display = 'none';
+}
+
+// Start code review
+async function startCodeReview() {
+    try {
+        showToast('Code review feature coming soon', 'info');
+        // TODO: Implement code review functionality
+        // This will be similar to startScan but for specific files
+    } catch (error) {
+        console.error('Failed to start code review:', error);
+        showToast('Failed to start code review', 'error');
+    }
+}
+
+// Show history view
+function showHistory() {
+    // Hide other sections
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('scanResultsSection').style.display = 'none';
+    document.getElementById('activeScansSection').style.display = 'none';
+
+    // Show history view
+    document.getElementById('historyView').style.display = 'block';
+
+    renderHistory();
+}
+
+// Render history list
+function renderHistory() {
+    const historyList = document.getElementById('historyList');
+    historyList.innerHTML = '';
+
+    if (securityHistory.length === 0) {
+        const emptyDiv = document.createElement('div');
+        emptyDiv.style.cssText = 'text-align: center; padding: 40px; color: var(--text-secondary);';
+        emptyDiv.textContent = 'No scan history';
+        historyList.appendChild(emptyDiv);
+        return;
+    }
+
+    securityHistory.slice().reverse().forEach(record => {
+        const historyCard = createHistoryCard(record);
+        historyList.appendChild(historyCard);
+    });
+}
+
+// Create history card element
+function createHistoryCard(record) {
+    const historyCard = document.createElement('div');
+    historyCard.style.cssText = 'background: var(--bg-primary); border: 1px solid var(--border-primary); border-radius: 12px; padding: 20px; margin-bottom: 16px; cursor: pointer; transition: border-color 0.2s;';
+    historyCard.onmouseover = () => historyCard.style.borderColor = 'var(--color-primary)';
+    historyCard.onmouseout = () => historyCard.style.borderColor = 'var(--border-primary)';
+    historyCard.onclick = async () => {
+        try {
+            const response = await fetch(`${API_BASE}/api/security/history/${record.id}`);
+            if (!response.ok) throw new Error('Failed to load result');
+            const data = await response.json();
+            renderScanResult(data.result);
+        } catch (error) {
+            showToast('Failed to load scan result', 'error');
+        }
+    };
+
+    const container = document.createElement('div');
+    container.style.cssText = 'display: flex; justify-content: space-between; align-items: start;';
+
+    const info = document.createElement('div');
+    info.style.flex = '1';
+
+    const title = document.createElement('div');
+    title.style.cssText = 'font-weight: 500; color: var(--text-primary);';
+    title.textContent = record.type === 'security-scan' ? 'Security Scan' : 'Code Review';
+
+    const timestamp = document.createElement('div');
+    timestamp.style.cssText = 'font-size: 13px; color: var(--text-secondary); margin-top: 4px;';
+    timestamp.textContent = new Date(record.timestamp).toLocaleString();
+
+    const issuesCount = document.createElement('div');
+    issuesCount.style.cssText = 'font-size: 13px; color: var(--text-secondary); margin-top: 4px;';
+    const count = (record.summary && record.summary.total) || 0;
+    issuesCount.textContent = `${count} issues found`;
+
+    info.appendChild(title);
+    info.appendChild(timestamp);
+    info.appendChild(issuesCount);
+
+    const actions = document.createElement('div');
+    actions.style.cssText = 'display: flex; gap: 8px;';
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'btn btn-secondary';
+    deleteBtn.style.cssText = 'padding: 6px 12px; font-size: 12px;';
+    deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        deleteHistoryRecord(record.id);
+    };
+
+    const deleteIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    deleteIcon.setAttribute('width', '14');
+    deleteIcon.setAttribute('height', '14');
+    deleteIcon.setAttribute('viewBox', '0 0 24 24');
+    deleteIcon.setAttribute('fill', 'none');
+    deleteIcon.setAttribute('stroke', 'currentColor');
+    deleteIcon.setAttribute('stroke-width', '2');
+
+    const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    polyline.setAttribute('points', '3 6 5 6 21 6');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', 'M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2');
+
+    deleteIcon.appendChild(polyline);
+    deleteIcon.appendChild(path);
+    deleteBtn.appendChild(deleteIcon);
+
+    actions.appendChild(deleteBtn);
+
+    container.appendChild(info);
+    container.appendChild(actions);
+
+    historyCard.appendChild(container);
+
+    return historyCard;
+}
+
+// Delete history record
+async function deleteHistoryRecord(recordId) {
+    try {
+        const confirmed = await confirmAction('Are you sure you want to delete this scan result?');
+        if (!confirmed) return;
+
+        const response = await fetch(`${API_BASE}/api/security/history/${recordId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete record');
+
+        // Reload history
+        await loadSecurityResults();
+        renderHistory();
+
+        showToast('Scan result deleted', 'success');
+    } catch (error) {
+        console.error('Failed to delete record:', error);
+        showToast('Failed to delete record', 'error');
+    }
 }
