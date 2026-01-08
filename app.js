@@ -213,12 +213,13 @@ async function loadSkills() {
 // Update skills statistics
 function updateSkillsStats() {
     const total = skills.length;
-    const userSkills = skills.filter(s => s.level === 'user').length;
-    const projectSkills = skills.filter(s => s.level === 'project').length;
+    const userSkills = skills.filter(s => s.location === 'user').length;
+    const projectSkills = skills.filter(s => s.location === 'project').length;
+    const managedSkills = skills.filter(s => s.location === 'managed').length;
 
     document.getElementById('totalSkills').textContent = total;
     document.getElementById('userSkills').textContent = userSkills;
-    document.getElementById('projectSkills').textContent = projectSkills;
+    document.getElementById('projectSkills').textContent = `${projectSkills} / ${managedSkills} managed`;
 }
 
 // Render skills
@@ -234,10 +235,11 @@ function renderSkills() {
         return true;
     });
 
-    // Group by level
+    // Group by location
     const grouped = {
-        user: filtered.filter(s => s.level === 'user'),
-        project: filtered.filter(s => s.level === 'project')
+        user: filtered.filter(s => s.location === 'user'),
+        project: filtered.filter(s => s.location === 'project'),
+        managed: filtered.filter(s => s.location === 'managed')
     };
 
     // Render
@@ -263,12 +265,17 @@ function renderSkills() {
         html += renderSkillsGroup('Project Skills', grouped.project, 'project');
     }
 
+    // Managed skills (from settings.json)
+    if (grouped.managed.length > 0) {
+        html += renderSkillsGroup('Managed Skills (from settings.json)', grouped.managed, 'managed');
+    }
+
     container.innerHTML = html;
 }
 
 // Render skills group
 function renderSkillsGroup(title, skillsList, level) {
-    const levelColor = level === 'user' ? '#3B82F6' : '#10B981';
+    const levelColor = level === 'user' ? '#3B82F6' : (level === 'project' ? '#10B981' : '#F59E0B');
 
     let html = `
         <div class="category-section">
@@ -351,8 +358,9 @@ async function viewSkill(skillId) {
                 <p><strong>ID:</strong> ${skill.id}</p>
                 <p><strong>Version:</strong> ${skill.version}</p>
                 <p><strong>Author:</strong> ${skill.author}</p>
-                <p><strong>Level:</strong> ${skill.level}</p>
-                <p><strong>Path:</strong> <code style="font-size: 12px;">${skill.path}</code></p>
+                <p><strong>Location:</strong> ${skill.location}</p>
+                <p><strong>Source:</strong> ${skill.source}</p>
+                ${skill.path ? `<p><strong>Path:</strong> <code style="font-size: 12px;">${skill.path}</code></p>` : ''}
                 <p><strong>Description:</strong></p>
                 <p>${skill.description}</p>
                 ${skill.tags.length > 0 ? `<p><strong>Tags:</strong> ${skill.tags.join(', ')}</p>` : ''}
