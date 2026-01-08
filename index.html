@@ -168,6 +168,12 @@
         .theme-indigo .main-count { color: #6366F1; }
         .theme-indigo:hover { border-color: rgba(99, 102, 241, 0.3); }
 
+        .theme-red::before { background: linear-gradient(90deg, #EF4444, #F87171); }
+        .theme-red .icon-box { background: rgba(239, 68, 68, 0.1); }
+        .theme-red .icon-box svg { stroke: #EF4444; }
+        .theme-red .main-count { color: #EF4444; }
+        .theme-red:hover { border-color: rgba(239, 68, 68, 0.3); }
+
         /* Card Header */
         .stat-card .card-header {
             display: flex;
@@ -1379,6 +1385,27 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Security Card -->
+                <div class="stat-card theme-red" data-tab="security" onclick="switchTab('security')" style="max-width: 300px; margin-left: 16px;">
+                    <div class="card-header">
+                        <div class="icon-box">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                            </svg>
+                        </div>
+                        <span class="card-title">Security Audit</span>
+                    </div>
+                    <div class="main-count" id="totalSecurityScans">0</div>
+                    <div class="sub-stats">
+                        <div class="stat-item">
+                            <span class="stat-val" id="activeScans">0</span> Active
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-val" id="totalIssues">0</span> Issues
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1583,6 +1610,136 @@
         </div>
         <!-- End Marketplace Tab -->
 
+        <!-- Security Audit Tab Content -->
+        <div id="securityTab" class="tab-content">
+            <!-- Toolbar with Actions -->
+            <div class="toolbar">
+                <div class="toolbar-row">
+                    <button class="btn btn-primary" id="startFullScanBtn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        </svg>
+                        Start Full Scan
+                    </button>
+                    <button class="btn btn-secondary" id="startReviewBtn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                        Code Review
+                    </button>
+                    <button class="btn btn-secondary" id="viewHistoryBtn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        History
+                    </button>
+                </div>
+            </div>
+
+            <!-- Scan Configuration Panel -->
+            <div id="scanConfigPanel" class="config-panel" style="display: none;">
+                <div style="background: var(--bg-primary); border: 1px solid var(--border-primary); border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+                    <h3 style="margin: 0 0 16px 0; font-size: 18px; color: var(--text-primary);">Scan Configuration</h3>
+
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-secondary);">Scan Type</label>
+                        <select id="scanTypeSelect" style="width: 100%; padding: 10px; border: 1px solid var(--border-primary); border-radius: 6px; background: var(--bg-secondary); color: var(--text-primary);">
+                            <option value="full">Full Project Scan</option>
+                            <option value="quick">Quick Scan</option>
+                            <option value="custom">Custom Path</option>
+                        </select>
+                    </div>
+
+                    <div id="customPathInput" style="margin-bottom: 16px; display: none;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-secondary);">Custom Path</label>
+                        <input type="text" id="scanPathInput" placeholder="./src" style="width: 100%; padding: 10px; border: 1px solid var(--border-primary); border-radius: 6px; background: var(--bg-secondary); color: var(--text-primary);">
+                    </div>
+
+                    <div style="display: flex; gap: 12px;">
+                        <button class="btn btn-primary" id="confirmScanBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            Start Scan
+                        </button>
+                        <button class="btn btn-secondary" id="cancelScanBtn">Cancel</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Display Area -->
+            <div id="securityResults">
+                <!-- Active Scans Section -->
+                <div id="activeScansSection" style="display: none; margin-bottom: 24px;">
+                    <h3 style="margin: 0 0 16px 0; font-size: 18px; color: var(--text-primary);">Active Scans</h3>
+                    <div id="activeScansList"></div>
+                </div>
+
+                <!-- Scan Results Section -->
+                <div id="scanResultsSection" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h3 style="margin: 0; font-size: 18px; color: var(--text-primary);">Latest Scan Results</h3>
+                        <div>
+                            <button class="filter-btn active" data-severity="all">All</button>
+                            <button class="filter-btn" data-severity="critical">Critical</button>
+                            <button class="filter-btn" data-severity="high">High</button>
+                            <button class="filter-btn" data-severity="medium">Medium</button>
+                            <button class="filter-btn" data-severity="low">Low</button>
+                        </div>
+                    </div>
+
+                    <!-- Summary Cards -->
+                    <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 24px;">
+                        <div class="stat-card theme-red" style="cursor: default;">
+                            <div class="card-header">
+                                <span class="card-title">Critical</span>
+                            </div>
+                            <div class="main-count" id="criticalCount">0</div>
+                        </div>
+                        <div class="stat-card theme-orange" style="cursor: default;">
+                            <div class="card-header">
+                                <span class="card-title">High</span>
+                            </div>
+                            <div class="main-count" id="highCount">0</div>
+                        </div>
+                        <div class="stat-card theme-purple" style="cursor: default;">
+                            <div class="card-header">
+                                <span class="card-title">Medium</span>
+                            </div>
+                            <div class="main-count" id="mediumCount">0</div>
+                        </div>
+                        <div class="stat-card theme-blue" style="cursor: default;">
+                            <div class="card-header">
+                                <span class="card-title">Low</span>
+                            </div>
+                            <div class="main-count" id="lowCount">0</div>
+                        </div>
+                    </div>
+
+                    <!-- Issues List -->
+                    <div id="issuesList"></div>
+                </div>
+
+                <!-- History View -->
+                <div id="historyView" style="display: none;">
+                    <h3 style="margin: 0 0 16px 0; font-size: 18px; color: var(--text-primary);">Scan History</h3>
+                    <div id="historyList"></div>
+                </div>
+
+                <!-- Empty State -->
+                <div id="emptyState" style="text-align: center; padding: 60px 20px;">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin: 0 auto 16px; opacity: 0.3;">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    </svg>
+                    <h3 style="margin: 0 0 8px 0; color: var(--text-secondary);">No Security Scans Yet</h3>
+                    <p style="margin: 0; color: var(--text-tertiary);">Click "Start Full Scan" to begin your first security audit</p>
+                </div>
+            </div>
+        </div>
+        <!-- End Security Audit Tab -->
+
     </div>
 
     <!-- Detail Panel -->
@@ -1609,6 +1766,60 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="modalCancel">Cancel</button>
                 <button class="btn btn-primary" id="modalConfirm">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Issue Details Modal -->
+    <div class="modal" id="issueDetailModal" style="display: none;">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span id="issueModalTitle">Issue Details</span>
+                    <button class="btn btn-secondary" id="issueModalClose" style="padding: 4px 8px; font-size: 12px;">✕</button>
+                </div>
+            </div>
+            <div class="modal-body" id="issueModalBody">
+                <!-- Severity Badge -->
+                <div style="margin-bottom: 16px;">
+                    <span id="issueSeverityBadge" class="badge" style="font-size: 14px; padding: 6px 12px;"></span>
+                </div>
+
+                <!-- Issue Description -->
+                <div style="margin-bottom: 16px;">
+                    <h4 style="margin: 0 0 8px 0; font-size: 16px; color: var(--text-primary);">Description</h4>
+                    <p id="issueDescription" style="margin: 0; color: var(--text-secondary); line-height: 1.6;"></p>
+                </div>
+
+                <!-- File Location -->
+                <div style="margin-bottom: 16px;">
+                    <h4 style="margin: 0 0 8px 0; font-size: 16px; color: var(--text-primary);">Location</h4>
+                    <div style="background: var(--bg-secondary); padding: 12px; border-radius: 6px; font-family: monospace; font-size: 13px;">
+                        <div style="color: var(--text-secondary);">
+                            <span style="color: var(--text-tertiary);">File:</span>
+                            <span id="issueFile"></span>
+                        </div>
+                        <div style="color: var(--text-secondary); margin-top: 4px;">
+                            <span style="color: var(--text-tertiary);">Line:</span>
+                            <span id="issueLine"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Code Snippet -->
+                <div id="issueCodeSection" style="margin-bottom: 16px; display: none;">
+                    <h4 style="margin: 0 0 8px 0; font-size: 16px; color: var(--text-primary);">Code Snippet</h4>
+                    <pre id="issueCodeSnippet" style="background: var(--bg-secondary); padding: 12px; border-radius: 6px; overflow-x: auto; font-family: monospace; font-size: 13px; margin: 0;"></pre>
+                </div>
+
+                <!-- Recommendation -->
+                <div id="issueRecommendationSection" style="margin-bottom: 16px; display: none;">
+                    <h4 style="margin: 0 0 8px 0; font-size: 16px; color: var(--text-primary);">Recommendation</h4>
+                    <p id="issueRecommendation" style="margin: 0; color: var(--text-secondary); line-height: 1.6;"></p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="issueModalDismiss">Close</button>
             </div>
         </div>
     </div>
