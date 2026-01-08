@@ -12,6 +12,10 @@ const marketplaceRoutes = new MarketplaceRoutes({
   currentVersion: '1.0.0'
 });
 
+// Security audit routes
+const SecurityRoutes = require('./lib/security/routes/security');
+const securityRoutes = new SecurityRoutes();
+
 const PORT = 3456;
 const SETTINGS_PATH = path.join(process.env.USERPROFILE || process.env.HOME, '.claude', 'settings.json');
 const USER_SKILLS_PATH = path.join(process.env.USERPROFILE || process.env.HOME, '.claude', 'skills');
@@ -459,6 +463,12 @@ async function handleRequest(req, res) {
             // Marketplace routes
             if (url.startsWith('/api/marketplace')) {
                 await marketplaceRoutes.handleRoute(req, res, url, method);
+                return;
+            }
+
+            // Security audit routes
+            if (url.startsWith('/api/security')) {
+                await securityRoutes.handleRoute(req, res, url, method);
                 return;
             }
 
