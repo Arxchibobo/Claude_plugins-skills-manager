@@ -43,13 +43,16 @@ async function init() {
     try {
         // Set first card as active
         document.querySelector('.stat-card[data-tab="plugins"]').classList.add('active');
-        
+
         await loadPlugins();
         setupEventListeners();
         renderPlugins();
-        
+
         // Load all stats in background
         loadAllStats();
+
+        // Check Claude CLI availability (Task 9)
+        checkClaudeCliAvailability();
     } catch (error) {
         showToast('Failed to load: ' + error.message, 'error');
     }
@@ -1887,8 +1890,10 @@ function hideScanConfig() {
     document.getElementById('scanPathInput').value = '';
 }
 
-// Start security scan
+// Start security scan (with loading indicator and error handling - Task 9)
 async function startScan() {
+    let loadingIndicator = null;
+
     try {
         const scanType = document.getElementById('scanTypeSelect').value;
         let scanPath = '.';
@@ -1903,6 +1908,9 @@ async function startScan() {
 
         hideScanConfig();
 
+        // Show loading indicator
+        loadingIndicator = showLoadingIndicator('Starting security scan...');
+
         // Show active scans section
         document.getElementById('activeScansSection').style.display = 'block';
         document.getElementById('emptyState').style.display = 'none';
@@ -1914,9 +1922,20 @@ async function startScan() {
             body: JSON.stringify({ path: scanPath, scope: scanType })
         });
 
+        // Hide loading indicator
+        hideLoadingIndicator(loadingIndicator);
+        loadingIndicator = null;
+
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to start scan');
+            const errorData = await response.json();
+
+            // Show detailed error modal if error info available
+            if (errorData.errorInfo) {
+                showSecurityErrorModal(errorData.errorInfo);
+            } else {
+                showToast(errorData.error || 'Failed to start scan', 'error');
+            }
+            return;
         }
 
         const data = await response.json();
@@ -1931,14 +1950,31 @@ async function startScan() {
         });
 
         renderActiveScan(data.scanId);
-        showToast('Security scan started', 'success');
+        showToast('Security scan started successfully', 'success');
 
         // Start polling for status
         pollScanStatus(data.scanId);
 
     } catch (error) {
+        // Hide loading indicator if still visible
+        if (loadingIndicator) {
+            hideLoadingIndicator(loadingIndicator);
+        }
+
         console.error('Failed to start scan:', error);
-        showToast(error.message || 'Failed to start scan', 'error');
+
+        // Show user-friendly error
+        const errorMessage = error.message || 'Failed to start scan';
+        if (error.message && error.message.includes('CLI')) {
+            // CLI-related error, show installation guide option
+            showSecurityErrorModal({
+                message: errorMessage,
+                suggestion: 'Claude Code CLI may not be installed. Click "View Install Guide" for setup instructions.',
+                action: 'install'
+            });
+        } else {
+            showToast(errorMessage, 'error');
+        }
     }
 }
 
@@ -2391,5 +2427,237 @@ async function deleteHistoryRecord(recordId) {
     } catch (error) {
         console.error('Failed to delete record:', error);
         showToast('Failed to delete record', 'error');
+    }
+}
+
+// ===================
+// CLI Availability Check and Error Handling (Task 9)
+// ===================
+
+/**
+ * Check Claude CLI availability on startup
+ * Shows installation guide if CLI is not available
+ */
+async function checkClaudeCliAvailability() {
+    try {
+        const response = await fetch(`${API_BASE}/api/security/cli-status`);
+
+        if (!response.ok) {
+            console.warn('Unable to check CLI status');
+            return;
+        }
+
+        const data = await response.json();
+
+        if (!data.available) {
+            showCliInstallationGuide();
+        }
+    } catch (error) {
+        console.error('Failed to check CLI availability:', error);
+    }
+}
+
+/**
+ * Show Claude CLI installation guide modal
+ */
+function showCliInstallationGuide() {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    modal.style.zIndex = '10000';
+
+    const modalContent = document.createElement('div');
+    modalContent.className = 'modal-content';
+    modalContent.style.maxWidth = '600px';
+
+    // Create header
+    const header = document.createElement('div');
+    header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;';
+
+    const title = document.createElement('h2');
+    title.textContent = 'Claude CLI Not Found';
+    title.style.margin = '0';
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'btn-icon';
+    closeBtn.innerHTML = '&times;';
+    closeBtn.style.fontSize = '28px';
+    closeBtn.onclick = () => modal.remove();
+
+    header.appendChild(title);
+    header.appendChild(closeBtn);
+
+    // Create body
+    const body = document.createElement('div');
+    body.style.marginBottom = '24px';
+
+    const message = document.createElement('p');
+    message.textContent = 'The security scanning feature requires Claude Code CLI to be installed. Follow these steps to get started:';
+    message.style.cssText = 'color: var(--text-secondary); margin-bottom: 20px;';
+
+    const steps = document.createElement('ol');
+    steps.style.cssText = 'padding-left: 20px; color: var(--text-secondary); line-height: 1.8;';
+    [
+        'Visit claude.ai/code and sign in with your account',
+        'Download Claude Code for your operating system',
+        'Install Claude Code and restart your terminal',
+        'Verify installation by running: <code style="background: var(--bg-secondary); padding: 2px 6px; border-radius: 4px;">claude --version</code>'
+    ].forEach(step => {
+        const li = document.createElement('li');
+        li.innerHTML = step;
+        steps.appendChild(li);
+    });
+
+    body.appendChild(message);
+    body.appendChild(steps);
+
+    // Create footer with action buttons
+    const footer = document.createElement('div');
+    footer.style.cssText = 'display: flex; gap: 12px; justify-content: flex-end;';
+
+    const docBtn = document.createElement('a');
+    docBtn.href = 'https://docs.anthropic.com/claude/docs/claude-code';
+    docBtn.target = '_blank';
+    docBtn.className = 'btn btn-secondary';
+    docBtn.textContent = 'View Documentation';
+
+    const downloadBtn = document.createElement('a');
+    downloadBtn.href = 'https://claude.ai/code';
+    downloadBtn.target = '_blank';
+    downloadBtn.className = 'btn btn-primary';
+    downloadBtn.textContent = 'Download Claude Code';
+
+    footer.appendChild(docBtn);
+    footer.appendChild(downloadBtn);
+
+    // Assemble modal
+    modalContent.appendChild(header);
+    modalContent.appendChild(body);
+    modalContent.appendChild(footer);
+    modal.appendChild(modalContent);
+
+    document.body.appendChild(modal);
+}
+
+/**
+ * Show detailed error modal with suggestions
+ * @param {Object} errorInfo - { message, suggestion, action }
+ */
+function showSecurityErrorModal(errorInfo) {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    modal.style.zIndex = '10000';
+
+    const modalContent = document.createElement('div');
+    modalContent.className = 'modal-content';
+    modalContent.style.maxWidth = '550px';
+
+    // Header
+    const header = document.createElement('div');
+    header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;';
+
+    const title = document.createElement('h2');
+    title.textContent = 'Security Scan Error';
+    title.style.margin = '0';
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'btn-icon';
+    closeBtn.innerHTML = '&times;';
+    closeBtn.style.fontSize = '28px';
+    closeBtn.onclick = () => modal.remove();
+
+    header.appendChild(title);
+    header.appendChild(closeBtn);
+
+    // Body
+    const body = document.createElement('div');
+    body.style.marginBottom = '24px';
+
+    // Error message
+    const errorMsg = document.createElement('div');
+    errorMsg.style.cssText = 'background: #FEE2E2; border: 1px solid #EF4444; border-radius: 8px; padding: 16px; margin-bottom: 16px;';
+    errorMsg.innerHTML = `<strong style="color: #991B1B;">Error:</strong> <span style="color: #7F1D1D;">${errorInfo.message}</span>`;
+
+    // Suggestion
+    const suggestion = document.createElement('div');
+    suggestion.style.cssText = 'background: var(--bg-secondary); border-radius: 8px; padding: 16px;';
+    suggestion.innerHTML = `<strong>Suggestion:</strong> ${errorInfo.suggestion}`;
+
+    body.appendChild(errorMsg);
+    body.appendChild(suggestion);
+
+    // Footer with action buttons
+    const footer = document.createElement('div');
+    footer.style.cssText = 'display: flex; gap: 12px; justify-content: flex-end;';
+
+    const closeModalBtn = document.createElement('button');
+    closeModalBtn.className = 'btn btn-secondary';
+    closeModalBtn.textContent = 'Close';
+    closeModalBtn.onclick = () => modal.remove();
+
+    footer.appendChild(closeModalBtn);
+
+    // Add action-specific button
+    if (errorInfo.action === 'install') {
+        const installBtn = document.createElement('button');
+        installBtn.className = 'btn btn-primary';
+        installBtn.textContent = 'View Install Guide';
+        installBtn.onclick = () => {
+            modal.remove();
+            showCliInstallationGuide();
+        };
+        footer.appendChild(installBtn);
+    }
+
+    // Assemble modal
+    modalContent.appendChild(header);
+    modalContent.appendChild(body);
+    modalContent.appendChild(footer);
+    modal.appendChild(modalContent);
+
+    document.body.appendChild(modal);
+}
+
+/**
+ * Show loading indicator
+ * @param {string} message - Loading message
+ * @returns {HTMLElement} - Loading element reference
+ */
+function showLoadingIndicator(message = 'Loading...') {
+    const loading = document.createElement('div');
+    loading.className = 'loading-indicator';
+    loading.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--bg-primary); border: 1px solid var(--border-primary); border-radius: 12px; padding: 24px 32px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); z-index: 9999; display: flex; align-items: center; gap: 16px;';
+
+    // Create spinner
+    const spinner = document.createElement('div');
+    spinner.style.cssText = 'width: 24px; height: 24px; border: 3px solid var(--border-primary); border-top-color: var(--color-primary); border-radius: 50%; animation: spin 0.8s linear infinite;';
+
+    const text = document.createElement('span');
+    text.textContent = message;
+    text.style.cssText = 'color: var(--text-primary); font-weight: 500;';
+
+    loading.appendChild(spinner);
+    loading.appendChild(text);
+
+    // Add spinner animation if not already present
+    if (!document.getElementById('spinner-style')) {
+        const style = document.createElement('style');
+        style.id = 'spinner-style';
+        style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+        document.head.appendChild(style);
+    }
+
+    document.body.appendChild(loading);
+    return loading;
+}
+
+/**
+ * Hide loading indicator
+ * @param {HTMLElement} loadingElement - Loading element to remove
+ */
+function hideLoadingIndicator(loadingElement) {
+    if (loadingElement && loadingElement.parentNode) {
+        loadingElement.remove();
     }
 }
