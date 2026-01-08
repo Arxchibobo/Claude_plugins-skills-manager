@@ -29,8 +29,17 @@ Plugins Management
 - Real-time search and filtering
 - View detailed configuration
 
-Skills Management (New)
+Skills Management
 - View user-level skills
 - View project-level skills
 - Search and View Details
 - README Documentation View
+
+Security Audit (New)
+- Automated security scanning powered by Claude Code CLI
+- Real-time scan progress and results visualization
+- Issue classification by severity (Critical/High/Medium/Low)
+- Scan history management (last 10 scans)
+- Intelligent caching for performance (1-hour TTL)
+- Detailed issue reports with fix recommendations
+- [Complete Guide](./SECURITY_AUDIT_GUIDE.md)
