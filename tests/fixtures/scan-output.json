@@ -1,0 +1,72 @@
+{
+  "issues": [
+    {
+      "id": "sql-injection-001",
+      "severity": "critical",
+      "file": "src/database/query.js",
+      "line": 42,
+      "column": 15,
+      "description": "Potential SQL injection vulnerability: User input directly concatenated into SQL query",
+      "rule": "security/sql-injection",
+      "fixed": false
+    },
+    {
+      "id": "xss-001",
+      "severity": "high",
+      "file": "src/views/profile.ejs",
+      "line": 28,
+      "column": 5,
+      "description": "Unescaped user input in HTML template may lead to XSS attack",
+      "rule": "security/xss",
+      "fixed": false
+    },
+    {
+      "id": "auth-bypass-001",
+      "severity": "high",
+      "file": "src/middleware/auth.js",
+      "line": 15,
+      "column": 8,
+      "description": "Authentication bypass: Missing token validation in protected route",
+      "rule": "security/auth-bypass",
+      "fixed": false
+    },
+    {
+      "id": "weak-crypto-001",
+      "severity": "medium",
+      "file": "src/utils/crypto.js",
+      "line": 10,
+      "column": 20,
+      "description": "Weak cryptographic algorithm: MD5 should not be used for password hashing",
+      "rule": "security/weak-crypto",
+      "fixed": false
+    },
+    {
+      "id": "hardcoded-secret-001",
+      "severity": "medium",
+      "file": "src/config/database.js",
+      "line": 5,
+      "column": 18,
+      "description": "Hardcoded database password found in source code",
+      "rule": "security/hardcoded-secret",
+      "fixed": false
+    },
+    {
+      "id": "insecure-random-001",
+      "severity": "low",
+      "file": "src/utils/token.js",
+      "line": 22,
+      "column": 12,
+      "description": "Using Math.random() for security-sensitive operations is not recommended",
+      "rule": "security/insecure-random",
+      "fixed": false
+    }
+  ],
+  "metadata": {
+    "scanTime": 1704715200000,
+    "tool": "security-scanning:sast",
+    "version": "1.0.0",
+    "filesScanned": 42,
+    "linesScanned": 5820
+  },
+  "progress": 100
+}

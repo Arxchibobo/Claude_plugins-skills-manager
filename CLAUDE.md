@@ -10,13 +10,13 @@
 
 <!-- ACTIVE_SPECS: .kiro/specs/security-audit -->
 <!-- TASK_DESC: Security Audit Feature - integrate code-review-ai and security-scanning capabilities into the plugin manager -->
-<!-- RUN_MODE: single -->
+<!-- RUN_MODE: auto -->
 
 | 项目 | 值 |
 |------|-----|
 | **Specs 路径** | `.kiro/specs/security-audit` |
 | **任务描述** | Security Audit Feature - integrate code-review-ai and security-scanning capabilities into the plugin manager |
-| **运行模式** | `single`（单步暂停） |
+| **运行模式** | `auto`（自动运行） |
 
 ### 运行模式说明
 
