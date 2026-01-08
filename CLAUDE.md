@@ -8,14 +8,14 @@
 
 ## 当前激活的 Specs
 
-<!-- ACTIVE_SPECS: .kiro/specs/github-marketplace -->
-<!-- TASK_DESC: GitHub Marketplace for Claude Code Plugin Manager - discover, browse, and install plugins/skills/commands/agents from GitHub -->
+<!-- ACTIVE_SPECS: .kiro/specs/security-audit -->
+<!-- TASK_DESC: Security Audit Feature - integrate code-review-ai and security-scanning capabilities into the plugin manager -->
 <!-- RUN_MODE: single -->
 
 | 项目 | 值 |
 |------|-----|
-| **Specs 路径** | `.kiro/specs/github-marketplace` |
-| **任务描述** | GitHub Marketplace for Claude Code Plugin Manager - discover, browse, and install plugins/skills/commands/agents from GitHub |
+| **Specs 路径** | `.kiro/specs/security-audit` |
+| **任务描述** | Security Audit Feature - integrate code-review-ai and security-scanning capabilities into the plugin manager |
 | **运行模式** | `single`（单步暂停） |
 
 ### 运行模式说明
