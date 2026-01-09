@@ -91,8 +91,8 @@
         /* Stats Grid */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
             margin-top: 24px;
         }
 
@@ -606,7 +606,7 @@
         /* Responsive */
         @media (max-width: 1024px) {
             .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
+                grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
             }
 
             .marketplace-container {
@@ -631,6 +631,11 @@
         @media (max-width: 640px) {
             .stats-grid {
                 grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .stat-card {
+                padding: 16px;
             }
         }
 
@@ -1631,9 +1636,8 @@
                 </div>
             </div>
 
-            <!-- Second Row: Marketplace -->
-            <div style="margin-top: 16px;">
-                <div class="stat-card theme-indigo" data-tab="marketplace" onclick="switchTab('marketplace')" style="max-width: 300px;">
+                <!-- Marketplace Card -->
+                <div class="stat-card theme-indigo" data-tab="marketplace" onclick="switchTab('marketplace')">
                     <div class="card-header">
                         <div class="icon-box">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1656,7 +1660,7 @@
                 </div>
 
                 <!-- Security Card -->
-                <div class="stat-card theme-red" data-tab="security" onclick="switchTab('security')" style="max-width: 300px; margin-left: 16px;">
+                <div class="stat-card theme-red" data-tab="security" onclick="switchTab('security')">
                     <div class="card-header">
                         <div class="icon-box">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1675,7 +1679,6 @@
                         </div>
                     </div>
                 </div>
-            </div>
         </div>
 
         <!-- Plugins Tab Content -->

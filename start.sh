@@ -1,9 +1,9 @@
 #!/bin/bash
-# Claude Plugins & Skills Manager Startup Script
+# Claude Plugin Manager Startup Script
 
 echo ""
 echo "============================================================"
-echo "  Starting Claude Plugins & Skills Manager..."
+echo "  Starting Claude Plugin Manager..."
 echo "============================================================"
 echo ""
 
@@ -17,5 +17,30 @@ if [ ! -d "node_modules" ]; then
     fi
 fi
 
-# Start the server
-node server-static.js
+# Start the server in background
+node server.js &
+SERVER_PID=$!
+
+# Wait for server to start
+sleep 2
+
+# Open browser
+URL="http://localhost:3456"
+if command -v xdg-open > /dev/null; then
+    xdg-open "$URL"  # Linux
+elif command -v open > /dev/null; then
+    open "$URL"  # macOS
+else
+    echo "Please open: $URL"
+fi
+
+echo ""
+echo "✓ Server started: $URL"
+echo "✓ Browser opened automatically"
+echo ""
+echo "Press Ctrl+C to stop the server"
+echo ""
+
+# Wait for Ctrl+C
+trap "kill $SERVER_PID 2>/dev/null; echo '\nServer stopped'; exit" INT TERM
+wait $SERVER_PID

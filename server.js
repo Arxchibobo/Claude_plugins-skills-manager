@@ -393,6 +393,16 @@ async function handleRequest(req, res) {
             return;
         }
 
+        // GET /api/marketplace/extensions - Mock marketplace data
+        if (method === 'GET' && url === '/api/marketplace/extensions') {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                extensions: [],
+                message: 'Marketplace coming soon'
+            }));
+            return;
+        }
+
         // Security API Routes (Task 1-12)
         if (url.startsWith('/api/security')) {
             return await securityRoutes.handleRoute(req, res, url, method);
