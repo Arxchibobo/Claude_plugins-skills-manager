@@ -242,10 +242,22 @@ function switchTab(tab) {
         }
     } else if (tab === 'commands') {
         document.getElementById('commandsTab').classList.add('active');
-        renderCommands();
+        if (commands.length === 0) {
+            loadCommands().then(() => renderCommands()).catch(error => {
+                console.error('Failed to load commands:', error);
+            });
+        } else {
+            renderCommands();
+        }
     } else if (tab === 'agents') {
         document.getElementById('agentsTab').classList.add('active');
-        renderAgents();
+        if (agents.length === 0) {
+            loadAgents().then(() => renderAgents()).catch(error => {
+                console.error('Failed to load agents:', error);
+            });
+        } else {
+            renderAgents();
+        }
     } else if (tab === 'marketplace') {
         document.getElementById('marketplaceTab').classList.add('active');
         if (marketplaceExtensions.length === 0) {
