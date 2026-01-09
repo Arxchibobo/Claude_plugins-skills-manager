@@ -393,12 +393,109 @@ async function handleRequest(req, res) {
             return;
         }
 
-        // GET /api/marketplace/extensions - Mock marketplace data
+        // GET /api/skills - List all skills
+        if (method === 'GET' && url === '/api/skills') {
+            try {
+                const result = await execClaude('skill list --output-format json');
+
+                // Parse skills from CLI output
+                let skills = [];
+                if (result.success && result.output) {
+                    try {
+                        const data = JSON.parse(result.output);
+                        if (data.result && typeof data.result === 'string') {
+                            // Extract skill names from text output
+                            const matches = data.result.match(/`([^`]+)`/g);
+                            if (matches) {
+                                skills = matches.map(m => m.replace(/`/g, '')).map(name => ({
+                                    name: name.replace('/', ''),
+                                    displayName: name,
+                                    location: name.startsWith('/') ? 'managed' : 'user',
+                                    description: 'Claude skill'
+                                }));
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Error parsing skills:', e);
+                    }
+                }
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ skills }));
+            } catch (error) {
+                console.error('Error loading skills:', error);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ skills: [] }));
+            }
+            return;
+        }
+
+        // GET /api/commands - List all commands
+        if (method === 'GET' && url === '/api/commands') {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                commands: [
+                    { name: 'help', description: 'Show help information' },
+                    { name: 'version', description: 'Show version information' },
+                    { name: 'plugin', description: 'Manage plugins' },
+                    { name: 'skill', description: 'Manage skills' },
+                    { name: 'agent', description: 'Manage agents' },
+                    { name: 'mcp', description: 'Manage MCP servers' }
+                ]
+            }));
+            return;
+        }
+
+        // GET /api/agents - List all agents
+        if (method === 'GET' && url === '/api/agents') {
+            try {
+                const result = await execClaude('agent list --output-format json');
+
+                let agents = [];
+                if (result.success && result.output) {
+                    try {
+                        const data = JSON.parse(result.output);
+                        // Try to parse agent data from result
+                        if (data.result) {
+                            // Extract agent names from text
+                            const lines = data.result.split('\n');
+                            agents = lines
+                                .filter(line => line.includes('agent'))
+                                .map((line, idx) => ({
+                                    id: `agent-${idx}`,
+                                    name: line.trim(),
+                                    type: 'custom'
+                                }));
+                        }
+                    } catch (e) {
+                        console.error('Error parsing agents:', e);
+                    }
+                }
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ agents }));
+            } catch (error) {
+                console.error('Error loading agents:', error);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ agents: [] }));
+            }
+            return;
+        }
+
+        // GET /api/marketplace/extensions - Marketplace extensions
         if (method === 'GET' && url === '/api/marketplace/extensions') {
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
-                extensions: [],
-                message: 'Marketplace coming soon'
+                extensions: [
+                    {
+                        id: 'example-extension',
+                        name: 'Example Extension',
+                        description: 'This is an example extension',
+                        version: '1.0.0',
+                        isInstalled: false
+                    }
+                ],
+                message: 'Marketplace extensions'
             }));
             return;
         }
