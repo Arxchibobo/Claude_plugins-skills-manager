@@ -9,6 +9,10 @@ const execPromise = util.promisify(exec);
 const PORT = 3456;
 const SETTINGS_PATH = path.join(process.env.USERPROFILE || process.env.HOME, '.claude', 'settings.json');
 
+// Import Security Routes (Task 1-12)
+const SecurityRoutes = require('./lib/security/routes/security');
+const securityRoutes = new SecurityRoutes();
+
 // Plugin metadata for categorization and descriptions
 const PLUGIN_METADATA = {
     // Language tags
@@ -387,6 +391,11 @@ async function handleRequest(req, res) {
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ success: true, message: 'Configuration saved' }));
             return;
+        }
+
+        // Security API Routes (Task 1-12)
+        if (url.startsWith('/api/security')) {
+            return await securityRoutes.handleRoute(req, res, url, method);
         }
 
         // 404
