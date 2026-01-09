@@ -398,7 +398,63 @@ async function handleRequest(req, res) {
             return await securityRoutes.handleRoute(req, res, url, method);
         }
 
-        // 404
+        // Serve static files (HTML, CSS, JS)
+        if (method === 'GET') {
+            const filePath = url === '/' ? 'index.html' : url.substring(1);
+            const fullPath = path.join(__dirname, filePath);
+
+            // Security: prevent directory traversal
+            if (!fullPath.startsWith(__dirname)) {
+                res.writeHead(403);
+                res.end(JSON.stringify({ error: 'Forbidden' }));
+                return;
+            }
+
+            // Check if file exists
+            try {
+                const stat = fs.statSync(fullPath);
+
+                if (stat.isDirectory()) {
+                    res.writeHead(403);
+                    res.end(JSON.stringify({ error: 'Cannot serve directory' }));
+                    return;
+                }
+
+                // Determine content type
+                const ext = path.extname(fullPath).toLowerCase();
+                const contentTypes = {
+                    '.html': 'text/html',
+                    '.css': 'text/css',
+                    '.js': 'application/javascript',
+                    '.json': 'application/json',
+                    '.png': 'image/png',
+                    '.jpg': 'image/jpeg',
+                    '.gif': 'image/gif',
+                    '.svg': 'image/svg+xml',
+                    '.ico': 'image/x-icon'
+                };
+
+                const contentType = contentTypes[ext] || 'application/octet-stream';
+
+                // Read and serve file
+                const content = fs.readFileSync(fullPath);
+                res.writeHead(200, { 'Content-Type': contentType });
+                res.end(content);
+                return;
+
+            } catch (error) {
+                if (error.code === 'ENOENT') {
+                    res.writeHead(404);
+                    res.end(JSON.stringify({ error: 'File not found' }));
+                } else {
+                    res.writeHead(500);
+                    res.end(JSON.stringify({ error: 'Internal server error' }));
+                }
+                return;
+            }
+        }
+
+        // 404 for non-GET requests or other cases
         res.writeHead(404);
         res.end(JSON.stringify({ error: 'Not found' }));
 
