@@ -727,25 +727,294 @@
 
         .filter-btn {
             padding: 8px 16px;
-            border: 1px solid var(--border-primary);
-            background: var(--bg-primary);
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 500;
+            margin-left: 8px;
+            border: 2px solid var(--border-primary);
+            background: var(--bg-secondary);
             color: var(--text-secondary);
+            border-radius: 8px;
             cursor: pointer;
-            transition: all 0.2s;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
         }
 
         .filter-btn:hover {
-            border-color: var(--color-primary);
-            color: var(--color-primary);
+            background: var(--bg-tertiary);
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
 
         .filter-btn.active {
-            background: var(--color-primary);
-            border-color: var(--color-primary);
+            background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
             color: white;
+            border-color: transparent;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        /* ========================================
+           Security Audit - Enhanced Styles
+           ======================================== */
+
+        /* Toolbar Enhancement */
+        #securityTab .toolbar {
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+            border: 1px solid var(--border-primary);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        #securityTab .toolbar-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        /* Enhanced Button Ripple Effect */
+        #securityTab .btn {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        #securityTab .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        #securityTab .btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        #securityTab .btn-primary {
+            background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        #securityTab .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+        }
+
+        #securityTab .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Config Panel Animation */
+        .config-panel {
+            margin-bottom: 24px;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .config-panel > div {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-primary);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .config-panel label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .config-panel select,
+        .config-panel input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--border-primary);
+            border-radius: 8px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .config-panel select:focus,
+        .config-panel input[type="text"]:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        /* Enhanced Stat Cards */
+        #securityTab .stat-card {
+            position: relative;
+            background: var(--bg-primary);
+            border: 2px solid var(--border-primary);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+        }
+
+        #securityTab .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--card-color) 0%, transparent 100%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        #securityTab .stat-card:hover::before {
+            opacity: 1;
+        }
+
+        #securityTab .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+            border-color: var(--card-color);
+        }
+
+        #securityTab .stat-card.theme-red {
+            --card-color: #EF4444;
+        }
+
+        #securityTab .stat-card.theme-orange {
+            --card-color: #F97316;
+        }
+
+        #securityTab .stat-card.theme-purple {
+            --card-color: #A855F7;
+        }
+
+        #securityTab .stat-card.theme-blue {
+            --card-color: #3B82F6;
+        }
+
+        #securityTab .main-count {
+            font-size: 36px;
+            font-weight: 700;
+            color: var(--card-color);
+            line-height: 1;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        /* Progress Indicator */
+        .progress-container {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            height: 8px;
+            overflow: hidden;
+            margin-top: 16px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #3B82F6 0%, #2563EB 100%);
+            border-radius: 8px;
+            transition: width 0.3s ease-out;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% {
+                transform: translateX(-100%);
+            }
+            100% {
+                transform: translateX(100%);
+            }
+        }
+
+        /* Loading Spinner */
+        .scan-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Empty State Enhancement */
+        #emptyState {
+            text-align: center;
+            padding: 80px 20px;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        #emptyState svg {
+            margin: 0 auto 24px;
+            opacity: 0.2;
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+        }
+
+        #emptyState h3 {
+            margin: 0 0 12px 0;
+            color: var(--text-secondary);
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        #emptyState p {
+            margin: 0;
+            color: var(--text-tertiary);
+            font-size: 14px;
         }
 
         .btn {
