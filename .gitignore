@@ -37,6 +37,9 @@ Desktop.ini
 .env.local
 .env.*.local
 
+# Claude settings (contains API keys and tokens)
+.claude/settings.local.json
+
 # Serena MCP files
 .serena/
 
