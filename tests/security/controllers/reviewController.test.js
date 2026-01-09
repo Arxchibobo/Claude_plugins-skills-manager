@@ -2,7 +2,7 @@
  * Unit tests for reviewController
  */
 
-const { test, describe, beforeEach, mock } = require('node:test');
+const { test, describe, beforeEach, afterEach, mock } = require('node:test');
 const assert = require('node:assert');
 
 // Import controller
@@ -12,6 +12,7 @@ const ReviewResult = require('../../../lib/security/models/ReviewResult');
 describe('reviewController', () => {
   let mockReq;
   let mockRes;
+  let mockClaudeIntegration;
 
   beforeEach(() => {
     // Reset mocks before each test
@@ -33,6 +34,25 @@ describe('reviewController', () => {
       statusCode: 200,
       data: null
     };
+
+    // Mock ClaudeIntegration to prevent real async operations
+    mockClaudeIntegration = {
+      checkClaudeAvailability: async () => ({
+        available: true,
+        version: 'Mock CLI v1.0.0'
+      }),
+      runCodeReview: async () => ({
+        success: true,
+        output: JSON.stringify({ issues: [] })
+      })
+    };
+
+    reviewController._setDependencies({ claudeIntegration: mockClaudeIntegration });
+  });
+
+  afterEach(() => {
+    // Clean up dependencies after each test
+    reviewController._resetDependencies();
   });
 
   describe('startReview', () => {
@@ -156,15 +176,26 @@ describe('reviewController', () => {
 
   describe('error handling', () => {
     test('startReview should catch and handle errors', async () => {
+      // Mock claudeIntegration to return unavailable
+      const mockClaudeIntegration = {
+        checkClaudeAvailability: async () => ({
+          available: false,
+          error: 'Claude CLI not found'
+        })
+      };
+      reviewController._setDependencies({ claudeIntegration: mockClaudeIntegration });
+
       mockReq.body = { files: ['test.js'] };
 
       await reviewController.startReview(mockReq, mockRes);
 
-      // Should handle error gracefully
-      assert.ok(mockRes.statusCode >= 400);
-      if (mockRes.statusCode >= 400) {
-        assert.ok(mockRes.data.error);
-      }
+      // Should return 500 error when Claude CLI is unavailable
+      assert.strictEqual(mockRes.statusCode, 500);
+      assert.ok(mockRes.data.error);
+      assert.ok(mockRes.data.error.includes('not available'));
+
+      // Reset dependencies
+      reviewController._resetDependencies();
     });
 
     test('getReviewResult should handle errors', async () => {

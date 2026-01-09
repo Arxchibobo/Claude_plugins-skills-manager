@@ -11,13 +11,36 @@ const { test, describe, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert');
 const http = require('http');
 const SecurityRoutes = require('../../../lib/security/routes/security');
+const scanController = require('../../../lib/security/controllers/scanController');
+const reviewController = require('../../../lib/security/controllers/reviewController');
 
 describe('SecurityRoutes', () => {
   let securityRoutes;
   let mockReq;
   let mockRes;
+  let mockClaudeIntegration;
 
   beforeEach(() => {
+    // Mock ClaudeIntegration to prevent real async operations
+    mockClaudeIntegration = {
+      checkClaudeAvailability: async () => ({
+        available: true,
+        version: 'Mock CLI v1.0.0'
+      }),
+      runSecurityScan: async () => ({
+        success: true,
+        output: JSON.stringify({ issues: [] })
+      }),
+      runCodeReview: async () => ({
+        success: true,
+        output: JSON.stringify({ issues: [] })
+      })
+    };
+
+    // Set mocked dependencies for both controllers
+    scanController._setDependencies({ claudeIntegration: mockClaudeIntegration });
+    reviewController._setDependencies({ claudeIntegration: mockClaudeIntegration });
+
     securityRoutes = new SecurityRoutes();
 
     mockReq = {
@@ -54,6 +77,12 @@ describe('SecurityRoutes', () => {
         return this;
       }
     };
+  });
+
+  afterEach(() => {
+    // Clean up controller dependencies after each test
+    scanController._resetDependencies();
+    reviewController._resetDependencies();
   });
 
   describe('Utility Methods', () => {

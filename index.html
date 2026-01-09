@@ -44,6 +44,37 @@
             --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
         }
 
+        /* Dark Theme */
+        [data-theme="dark"] {
+            /* Color Palette - Dark Mode */
+            --color-primary: #60A5FA;
+            --color-primary-hover: #3B82F6;
+            --color-secondary: #94A3B8;
+            --color-success: #34D399;
+            --color-danger: #F87171;
+            --color-warning: #FBBF24;
+
+            /* Backgrounds */
+            --bg-primary: #1E293B;
+            --bg-secondary: #0F172A;
+            --bg-tertiary: #1E293B;
+            --bg-hover: #334155;
+
+            /* Text */
+            --text-primary: #F1F5F9;
+            --text-secondary: #CBD5E1;
+            --text-tertiary: #64748B;
+
+            /* Borders */
+            --border-primary: #334155;
+            --border-secondary: #475569;
+
+            /* Shadows */
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5);
+        }
+
         body {
             font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--bg-secondary);
@@ -637,6 +668,36 @@
             .stat-card {
                 padding: 16px;
             }
+        }
+
+        /* Theme Toggle Button */
+        .theme-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            border-radius: 20px;
+            padding: 6px 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .theme-toggle:hover {
+            background: var(--bg-hover);
+            border-color: var(--border-secondary);
+        }
+
+        .theme-toggle-icon {
+            width: 18px;
+            height: 18px;
+            color: var(--color-primary);
+        }
+
+        .theme-toggle-text {
+            font-weight: 500;
         }
 
         /* Tab Navigation - Hidden, using cards instead */
@@ -1552,6 +1613,23 @@
                         </svg>
                     </div>
                     <h1>Claude Code Manager</h1>
+                </div>
+                <div class="theme-toggle" onclick="toggleTheme()">
+                    <svg id="sunIcon" class="theme-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5"/>
+                        <line x1="12" y1="1" x2="12" y2="3"/>
+                        <line x1="12" y1="21" x2="12" y2="23"/>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                        <line x1="1" y1="12" x2="3" y2="12"/>
+                        <line x1="21" y1="12" x2="23" y2="12"/>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                    </svg>
+                    <svg id="moonIcon" class="theme-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                    </svg>
+                    <span class="theme-toggle-text" id="themeText">Light</span>
                 </div>
             </div>
 

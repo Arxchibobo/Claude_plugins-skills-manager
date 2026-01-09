@@ -2,7 +2,7 @@
  * Unit tests for scanController
  */
 
-const { test, describe, beforeEach, mock } = require('node:test');
+const { test, describe, beforeEach, afterEach, mock } = require('node:test');
 const assert = require('node:assert');
 
 // Import controller
@@ -37,8 +37,24 @@ describe('scanController', () => {
       data: null
     };
 
-    // Mock dependencies (these would need to be injected or mocked at module level)
-    // For now, we're testing the controller logic structure
+    // Mock ClaudeIntegration to prevent real async operations
+    mockClaudeIntegration = {
+      checkClaudeAvailability: async () => ({
+        available: true,
+        version: 'Mock CLI v1.0.0'
+      }),
+      runSecurityScan: async () => ({
+        success: true,
+        output: JSON.stringify({ issues: [] })
+      })
+    };
+
+    scanController._setDependencies({ claudeIntegration: mockClaudeIntegration });
+  });
+
+  afterEach(() => {
+    // Clean up dependencies after each test
+    scanController._resetDependencies();
   });
 
   describe('startScan', () => {
@@ -145,16 +161,27 @@ describe('scanController', () => {
 
   describe('error handling', () => {
     test('startScan should catch and handle errors', async () => {
+      // Mock claudeIntegration to return unavailable
+      const mockClaudeIntegration = {
+        checkClaudeAvailability: async () => ({
+          available: false,
+          error: 'Claude CLI not found'
+        }),
+        getUserFriendlyError: () => ({ message: 'CLI not available', suggestion: 'Install Claude CLI' })
+      };
+      scanController._setDependencies({ claudeIntegration: mockClaudeIntegration });
+
       mockReq.body = { path: '/test/path' };
 
-      // Force an error scenario (Claude CLI not available is likely)
       await scanController.startScan(mockReq, mockRes);
 
-      // Should handle error gracefully
-      assert.ok(mockRes.statusCode >= 400);
-      if (mockRes.statusCode >= 400) {
-        assert.ok(mockRes.data.error);
-      }
+      // Should return 500 error when Claude CLI is unavailable
+      assert.strictEqual(mockRes.statusCode, 500);
+      assert.ok(mockRes.data.error);
+      assert.ok(mockRes.data.error.includes('not available'));
+
+      // Reset dependencies
+      scanController._resetDependencies();
     });
 
     test('getScanStatus should handle errors', async () => {

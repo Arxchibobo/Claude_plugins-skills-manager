@@ -38,8 +38,43 @@ let activeScanId = null;
 let scanPollInterval = null;
 let securitySeverityFilter = 'all';
 
+// Theme Management
+function initTheme() {
+    // Load theme from localStorage or default to light
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    updateThemeButton(savedTheme);
+}
+
+function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    updateThemeButton(newTheme);
+}
+
+function updateThemeButton(theme) {
+    const themeText = document.getElementById('themeText');
+    const sunIcon = document.getElementById('sunIcon');
+    const moonIcon = document.getElementById('moonIcon');
+
+    if (theme === 'dark') {
+        themeText.textContent = 'Dark';
+        sunIcon.style.display = 'none';
+        moonIcon.style.display = 'block';
+    } else {
+        themeText.textContent = 'Light';
+        sunIcon.style.display = 'block';
+        moonIcon.style.display = 'none';
+    }
+}
+
 // Initialize
 async function init() {
+    // Initialize theme first
+    initTheme();
     try {
         // Set first card as active
         document.querySelector('.stat-card[data-tab="plugins"]').classList.add('active');

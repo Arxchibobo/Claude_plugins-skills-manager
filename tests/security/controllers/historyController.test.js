@@ -30,6 +30,9 @@ describe('historyController', () => {
       maxRecords: 5
     });
 
+    // Inject test history manager into controller
+    historyController._setHistoryManager(historyManager);
+
     // Add some test data
     const scanResult1 = new ScanResult({ id: 'scan_test_1', status: 'completed' });
     const scanResult2 = new ScanResult({ id: 'scan_test_2', status: 'failed' });
@@ -61,6 +64,9 @@ describe('historyController', () => {
   });
 
   afterEach(async () => {
+    // Reset history manager to default instance
+    historyController._resetHistoryManager();
+
     // Cleanup test directory
     try {
       const files = await fs.readdir(testDir);

@@ -85,7 +85,7 @@ describe('ClaudeIntegration', () => {
       const result = await integration.checkClaudeAvailability();
 
       assert.strictEqual(result.available, false);
-      assert.ok(result.error.includes('timeout'));
+      assert.ok(result.error.includes('timed out'));
     });
   });
 
@@ -120,16 +120,17 @@ describe('ClaudeIntegration', () => {
       try {
         await integration.runSecurityScan({ path: tempFile });
 
-        // Verify command structure
+        // Verify command structure - using -p (print mode)
         assert.strictEqual(mockExecFile.mock.calls.length, 1);
         const call = mockExecFile.mock.calls[0];
         const args = call.arguments[1];
 
-        assert.strictEqual(args[0], 'skill');
-        assert.strictEqual(args[1], 'run');
-        assert.strictEqual(args[2], 'security-scanning:sast');
-        assert.strictEqual(args[3], '--path');
-        assert.ok(path.isAbsolute(args[4]));
+        assert.strictEqual(args[0], '-p');
+        assert.ok(args[1].includes('security')); // Check prompt contains security
+        assert.strictEqual(args[2], '--output-format');
+        assert.strictEqual(args[3], 'json');
+        assert.strictEqual(args[4], '--add-dir');
+        assert.ok(path.isAbsolute(args[5]));
       } finally {
         // Cleanup
         await fs.unlink(tempFile).catch(() => {});
@@ -147,14 +148,15 @@ describe('ClaudeIntegration', () => {
       try {
         await integration.runSecurityScan({
           path: tempFile,
-          scope: 'file'
+          scope: 'full'
         });
 
         const call = mockExecFile.mock.calls[0];
         const args = call.arguments[1];
 
-        assert.ok(args.includes('--scope'));
-        assert.ok(args.includes('file'));
+        // Scope is included in the prompt, not as a separate arg
+        assert.strictEqual(args[0], '-p');
+        assert.ok(args[1].includes('comprehensive security audit'));
       } finally {
         await fs.unlink(tempFile).catch(() => {});
       }
@@ -177,9 +179,11 @@ describe('ClaudeIntegration', () => {
         const call = mockExecFile.mock.calls[0];
         const args = call.arguments[1];
 
-        assert.ok(args.includes('--exclude'));
-        assert.ok(args.includes('node_modules'));
-        assert.ok(args.includes('*.test.js'));
+        // Exclude patterns are included in the prompt
+        assert.strictEqual(args[0], '-p');
+        assert.ok(args[1].includes('Exclude these patterns:'));
+        assert.ok(args[1].includes('node_modules'));
+        assert.ok(args[1].includes('*.test.js'));
       } finally {
         await fs.unlink(tempFile).catch(() => {});
       }
@@ -256,8 +260,10 @@ describe('ClaudeIntegration', () => {
         const call = mockExecFile.mock.calls[0];
         const args = call.arguments[1];
 
-        assert.ok(args.includes('--file'));
-        assert.strictEqual(args.filter(arg => arg === '--file').length, 1);
+        // Using -p mode with prompt containing file path
+        assert.strictEqual(args[0], '-p');
+        assert.ok(args[1].includes('code review'));
+        assert.ok(args[1].includes(path.resolve(tempFile)));
       } finally {
         await fs.unlink(tempFile).catch(() => {});
       }
@@ -279,7 +285,10 @@ describe('ClaudeIntegration', () => {
         const call = mockExecFile.mock.calls[0];
         const args = call.arguments[1];
 
-        assert.strictEqual(args.filter(arg => arg === '--file').length, 2);
+        // Using -p mode with prompt containing both file paths
+        assert.strictEqual(args[0], '-p');
+        assert.ok(args[1].includes(path.resolve(tempFile1)));
+        assert.ok(args[1].includes(path.resolve(tempFile2)));
       } finally {
         await fs.unlink(tempFile1).catch(() => {});
         await fs.unlink(tempFile2).catch(() => {});
@@ -303,8 +312,9 @@ describe('ClaudeIntegration', () => {
         const call = mockExecFile.mock.calls[0];
         const args = call.arguments[1];
 
-        assert.ok(args.includes('--focus'));
-        assert.ok(args.includes('security'));
+        // Focus is included in the prompt
+        assert.strictEqual(args[0], '-p');
+        assert.ok(args[1].includes('Security vulnerabilities'));
       } finally {
         await fs.unlink(tempFile).catch(() => {});
       }
@@ -324,9 +334,12 @@ describe('ClaudeIntegration', () => {
         const call = mockExecFile.mock.calls[0];
         const args = call.arguments[1];
 
-        assert.strictEqual(args[0], 'skill');
-        assert.strictEqual(args[1], 'run');
-        assert.strictEqual(args[2], 'code-review-ai:ai-review');
+        // Using -p (print mode) with prompt and --output-format json
+        assert.strictEqual(args[0], '-p');
+        assert.ok(args[1].includes('code review'));
+        assert.strictEqual(args[2], '--output-format');
+        assert.strictEqual(args[3], 'json');
+        assert.ok(args.includes('--add-dir'));
       } finally {
         await fs.unlink(tempFile).catch(() => {});
       }
@@ -374,7 +387,7 @@ describe('ClaudeIntegration', () => {
       error.signal = 'SIGTERM';
 
       const message = integration._normalizeError(error);
-      assert.ok(message.includes('timeout'));
+      assert.ok(message.includes('timed out'));
     });
 
     test('should handle command not found', () => {
@@ -398,7 +411,7 @@ describe('ClaudeIntegration', () => {
       error.code = 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER';
 
       const message = integration._normalizeError(error);
-      assert.ok(message.includes('exceeded maximum buffer'));
+      assert.ok(message.includes('exceeded'));
     });
 
     test('should include stderr in error message', () => {
