@@ -2116,11 +2116,42 @@ async function pollScanStatus(scanId) {
         clearInterval(scanPollInterval);
     }
 
+    const MAX_POLL_ATTEMPTS = 60; // 60 * 2 seconds = 2 minutes max
+    const POLL_INTERVAL = 2000; // 2 seconds
+    let pollAttempts = 0;
+
     scanPollInterval = setInterval(async () => {
         try {
+            pollAttempts++;
+
+            // Check if max attempts reached
+            if (pollAttempts > MAX_POLL_ATTEMPTS) {
+                clearInterval(scanPollInterval);
+
+                // Remove from active scans
+                securityScans = securityScans.filter(s => s.id !== scanId);
+                const scanCard = document.getElementById(`scan-${scanId}`);
+                if (scanCard) scanCard.remove();
+
+                // Hide active scans if empty
+                if (securityScans.length === 0) {
+                    document.getElementById('activeScansSection').style.display = 'none';
+                }
+
+                showToast('Security scan timed out after 2 minutes. Please try again.', 'error');
+                return;
+            }
+
             const response = await fetch(`${API_BASE}/api/security/scan/${scanId}`);
             if (!response.ok) {
                 clearInterval(scanPollInterval);
+
+                // Remove from active scans
+                securityScans = securityScans.filter(s => s.id !== scanId);
+                const scanCard = document.getElementById(`scan-${scanId}`);
+                if (scanCard) scanCard.remove();
+
+                showToast('Failed to check scan status', 'error');
                 return;
             }
 
@@ -2161,14 +2192,26 @@ async function pollScanStatus(scanId) {
                 const scanCard = document.getElementById(`scan-${scanId}`);
                 if (scanCard) scanCard.remove();
 
+                // Hide active scans if empty
+                if (securityScans.length === 0) {
+                    document.getElementById('activeScansSection').style.display = 'none';
+                }
+
                 showToast('Security scan failed', 'error');
             }
 
         } catch (error) {
             console.error('Failed to poll scan status:', error);
             clearInterval(scanPollInterval);
+
+            // Remove from active scans
+            securityScans = securityScans.filter(s => s.id !== scanId);
+            const scanCard = document.getElementById(`scan-${scanId}`);
+            if (scanCard) scanCard.remove();
+
+            showToast('Error polling scan status', 'error');
         }
-    }, 2000); // Poll every 2 seconds
+    }, POLL_INTERVAL);
 }
 
 // Render scan result
